@@ -1,5 +1,3 @@
-#![feature(slice_patterns)]
-
 extern crate byteorder;
 extern crate crc;
 extern crate eventual;
