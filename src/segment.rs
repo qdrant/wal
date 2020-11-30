@@ -137,13 +137,13 @@ impl Segment {
                                   format!("invalid segment capacity: {}", capacity)));
         }
 
-        let file = try!(OpenOptions::new().read(true).write(true).create(true).open(&path));
-        try!(file.allocate(capacity as u64));
+        let file = OpenOptions::new().read(true).write(true).create(true).open(&path)?;
+        file.allocate(capacity as u64)?;
 
-        let mut mmap = try!(Mmap::open_with_offset(&file,
+        let mut mmap = Mmap::open_with_offset(&file,
                                                    Protection::ReadWrite,
                                                    0,
-                                                   capacity)).into_view_sync();
+                                                   capacity)?.into_view_sync();
         let seed = rand::random();
 
         {
@@ -154,7 +154,7 @@ impl Segment {
         }
 
         let segment = Segment {
-            mmap: mmap,
+            mmap,
             path: path.as_ref().to_path_buf(),
             index: Vec::new(),
             crc: seed,
@@ -168,8 +168,8 @@ impl Segment {
     ///
     /// An individual file must only be opened by one segment at a time.
     pub fn open<P>(path: P) -> Result<Segment> where P: AsRef<Path> {
-        let file = try!(OpenOptions::new().read(true).write(true).create(false).open(&path));
-        let capacity = try!(file.metadata()).len();
+        let file = OpenOptions::new().read(true).write(true).create(false).open(&path)?;
+        let capacity = file.metadata()?.len();
         if capacity > usize::max_value() as u64 || capacity < HEADER_LEN as u64 {
             return Err(Error::new(ErrorKind::InvalidInput,
                                   format!("invalid segment capacity: {}", capacity)));
@@ -178,10 +178,10 @@ impl Segment {
         // Round capacity down to the nearest 8-byte alignment, since the
         // segment would not be able to take advantage of the space.
         let capacity = capacity as usize & !7;
-        let mmap = try!(Mmap::open_with_offset(&file,
+        let mmap = Mmap::open_with_offset(&file,
                                                Protection::ReadWrite,
                                                0,
-                                               capacity)).into_view_sync();
+                                               capacity)?.into_view_sync();
 
         let mut index = Vec::new();
         let mut crc;
@@ -225,10 +225,10 @@ impl Segment {
         }
 
         let segment = Segment {
-            mmap: mmap,
+            mmap,
             path: path.as_ref().to_path_buf(),
-            index: index,
-            crc: crc,
+            index,
+            crc,
             flush_offset: 0,
         };
         info!("{:?}: opened", segment);
@@ -262,7 +262,7 @@ impl Segment {
                 // Segment is that the index always holds valid offset and
                 // length bounds.
                 view.restrict(offset, len).expect("illegal segment offset or length");
-                Entry { view: view }
+                Entry { view }
             })
     }
 
@@ -332,7 +332,7 @@ impl Segment {
             debug!("{:?}: flushing byte range [{}, {})", self, start, end);
             let mut view = unsafe { self.mmap.clone() };
             self.set_flush_offset(end);
-            try!(view.restrict(start, end - start));
+            view.restrict(start, end - start)?;
             view.flush()
         }
     }
@@ -376,18 +376,18 @@ impl Segment {
         assert_eq!(required_capacity & !7, required_capacity);
         if required_capacity > self.capacity() {
             info!("{:?}: resizing to {} bytes", self, required_capacity);
-            try!(self.flush());
-            let file = try!(OpenOptions::new()
+            self.flush()?;
+            let file = OpenOptions::new()
                                         .read(true)
                                         .write(true)
                                         .create(false)
-                                        .open(&self.path));
-            try!(file.allocate(required_capacity as u64));
+                                        .open(&self.path)?;
+            file.allocate(required_capacity as u64)?;
 
-            let mut mmap = try!(Mmap::open_with_offset(&file,
+            let mut mmap = Mmap::open_with_offset(&file,
                                                        Protection::ReadWrite,
                                                        0,
-                                                       required_capacity)).into_view_sync();
+                                                       required_capacity)?.into_view_sync();
             mem::swap(&mut mmap, &mut self.mmap);
         }
         Ok(())
@@ -438,7 +438,7 @@ impl Segment {
     /// guarantee that the rename is durable in the event of a crash.
     pub fn rename<P>(&mut self, path: P) -> Result<()> where P: AsRef<Path> {
         info!("{:?}: renaming file to {:?}", self, path.as_ref());
-        try!(fs::rename(&self.path, &path));
+        fs::rename(&self.path, &path)?;
         self.path = path.as_ref().to_path_buf();
         Ok(())
     }

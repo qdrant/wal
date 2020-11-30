@@ -108,15 +108,15 @@ impl Wal {
     pub fn with_options<P>(path: P, options: &WalOptions) -> Result<Wal> where P: AsRef<Path> {
         debug!("Wal {{ path: {:?} }}: opening", path.as_ref());
 
-        let dir = try!(File::open(&path));
-        try!(dir.try_lock_exclusive());
+        let dir = File::open(&path)?;
+        dir.try_lock_exclusive()?;
 
         // Holds open segments in the directory.
         let mut open_segments: Vec<OpenSegment> = Vec::new();
         let mut closed_segments: Vec<ClosedSegment> = Vec::new();
 
-        for entry in try!(fs::read_dir(&path)) {
-            match try!(open_dir_entry(try!(entry))) {
+        for entry in fs::read_dir(&path)? {
+            match open_dir_entry(entry?)? {
                 WalSegment::Open(open_segment) => open_segments.push(open_segment),
                 WalSegment::Closed(closed_segment) => closed_segments.push(closed_segment),
             }
@@ -156,7 +156,7 @@ impl Wal {
                 let stranded_segment = open_segment.take();
                 open_segment = Some(segment);
                 if let Some(segment) = stranded_segment {
-                    let closed_segment = try!(close_segment(segment, next_start_index));
+                    let closed_segment = close_segment(segment, next_start_index)?;
                     next_start_index += closed_segment.segment.len() as u64;
                     closed_segments.push(closed_segment);
                 }
@@ -174,14 +174,14 @@ impl Wal {
 
         let open_segment = match open_segment {
             Some(segment) => segment,
-            None => try!(creator.next()),
+            None => creator.next()?,
         };
 
         let wal = Wal {
-            open_segment: open_segment,
-            closed_segments: closed_segments,
-            creator: creator,
-            dir: dir,
+            open_segment,
+            closed_segments,
+            creator,
+            dir,
             path: path.as_ref().to_path_buf(),
             flush: None,
         };
@@ -191,7 +191,7 @@ impl Wal {
 
     fn retire_open_segment(&mut self) -> Result<()> {
         trace!("{:?}: retiring open segment", self);
-        let mut segment = try!(self.creator.next());
+        let mut segment = self.creator.next()?;
         mem::swap(&mut self.open_segment, &mut segment);
 
         self.flush = Some(self.flush
@@ -200,7 +200,7 @@ impl Wal {
                               .and(segment.segment.flush_async()));
 
         let start_index = self.open_segment_start_index();
-        self.closed_segments.push(try!(close_segment(segment, start_index)));
+        self.closed_segments.push(close_segment(segment, start_index)?);
         debug!("{:?}: open segment retired. start_index: {}", self, start_index);
         Ok(())
     }
@@ -209,9 +209,9 @@ impl Wal {
         trace!("{:?}: appending entry of length {}", self, entry.len());
         if !self.open_segment.segment.sufficient_capacity(entry.len()) {
             if !self.open_segment.segment.is_empty() {
-                try!(self.retire_open_segment());
+                self.retire_open_segment()?;
             }
-            try!(self.open_segment.segment.ensure_capacity(entry.len()));
+            self.open_segment.segment.ensure_capacity(entry.len())?;
         }
 
         Ok(self.open_segment_start_index()
@@ -257,7 +257,7 @@ impl Wal {
                     if from == self.closed_segments[index].start_index {
                         for segment in self.closed_segments.drain(index..) {
                             // TODO: this should be async
-                            try!(segment.segment.delete());
+                            segment.segment.delete()?;
                         }
                     } else {
                         {
@@ -267,7 +267,7 @@ impl Wal {
                         if index + 1 < self.closed_segments.len() {
                             for segment in self.closed_segments.drain(index + 1..) {
                                 // TODO: this should be async
-                                try!(segment.segment.delete());
+                                segment.segment.delete()?;
                             }
                         }
                     }
@@ -278,7 +278,7 @@ impl Wal {
                                                         .map_or(0, |segment| segment.start_index));
                     for segment in self.closed_segments.drain(..) {
                         // TODO: this should be async
-                        try!(segment.segment.delete());
+                        segment.segment.delete()?;
                     }
                 }
             }
@@ -297,13 +297,13 @@ impl Wal {
         } else if until >= self.open_segment_start_index() {
             // Truncate all closed segments.
             for segment in self.closed_segments.drain(..) {
-                try!(segment.segment.delete())
+                segment.segment.delete()?
             }
         } else {
             let index = self.find_closed_segment(until).unwrap();
             trace!("PREFIX TRUNCATING UNTIL SEGMENT {}", index);
             for segment in self.closed_segments.drain(..index) {
-                try!(segment.segment.delete())
+                segment.segment.delete()?
             }
         }
         Ok(())
@@ -357,12 +357,12 @@ impl fmt::Debug for Wal {
 
 fn close_segment(mut segment: OpenSegment, start_index: u64) -> Result<ClosedSegment> {
     let new_path = segment.segment.path().with_file_name(format!("closed-{}", start_index));
-    try!(segment.segment.rename(new_path));
-    Ok(ClosedSegment { start_index: start_index, segment: segment.segment })
+    segment.segment.rename(new_path)?;
+    Ok(ClosedSegment { start_index, segment: segment.segment })
 }
 
 fn open_dir_entry(entry: fs::DirEntry) -> Result<WalSegment> {
-    let metadata = try!(entry.metadata());
+    let metadata = entry.metadata()?;
 
     let error = || {
         Error::new(ErrorKind::InvalidData,
@@ -373,17 +373,17 @@ fn open_dir_entry(entry: fs::DirEntry) -> Result<WalSegment> {
         return Err(error());
     }
 
-    let filename = try!(entry.file_name().into_string().map_err(|_| error()));
+    let filename = entry.file_name().into_string().map_err(|_| error())?;
     match &*filename.split('-').collect::<Vec<&str>>() {
         &["open", ref id] => {
-            let id = try!(u64::from_str(id).map_err(|_| error()));
-            let segment = try!(Segment::open(entry.path()));
-            Ok(WalSegment::Open(OpenSegment { segment: segment, id: id }))
+            let id = u64::from_str(id).map_err(|_| error())?;
+            let segment = Segment::open(entry.path())?;
+            Ok(WalSegment::Open(OpenSegment { segment, id }))
         },
         &["closed", ref start] => {
-            let start = try!(u64::from_str(start).map_err(|_| error()));
-            let segment = try!(Segment::open(entry.path()));
-            Ok(WalSegment::Closed(ClosedSegment { start_index: start, segment: segment }))
+            let start = u64::from_str(start).map_err(|_| error())?;
+            let segment = Segment::open(entry.path())?;
+            Ok(WalSegment::Closed(ClosedSegment { start_index: start, segment }))
         },
         _ => Err(error()),
     }
@@ -457,16 +457,16 @@ fn create_loop(tx: SyncSender<OpenSegment>,
         }
     }
 
-    let dir = try!(File::open(&path));
+    let dir = File::open(&path)?;
 
     while cont {
         id += 1;
         path.push(format!("open-{}", id));
-        let segment = OpenSegment { id: id, segment: try!(Segment::create(&path, capacity)) };
+        let segment = OpenSegment { id, segment: Segment::create(&path, capacity)? };
         path.pop();
         // Sync the directory, guaranteeing that the segment file is durably
         // stored on the filesystem.
-        try!(dir.sync_all());
+        dir.sync_all()?;
         cont = tx.send(segment).is_ok();
     }
 
@@ -568,7 +568,7 @@ mod test {
 
             for entry in &entries {
                 if let Err(error) = wal.append(entry) {
-                    return TestResult::error(error.description());
+                    return TestResult::error(error.to_string());
                 }
             }
 
