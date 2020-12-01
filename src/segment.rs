@@ -4,7 +4,6 @@ use std::io::{
     Error,
     ErrorKind,
     Result,
-    Write,
 };
 use std::mem;
 use std::ops::Deref;
@@ -15,7 +14,7 @@ use std::thread;
 
 use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
-use eventual::{Async, Future};
+use eventual::Future;
 use fs2::FileExt;
 use log;
 use memmap::{Mmap, Protection, MmapViewSync};
@@ -147,7 +146,7 @@ impl Segment {
         let seed = rand::random();
 
         {
-            let mut segment = unsafe { &mut mmap.as_mut_slice() };
+            let segment = unsafe { &mut mmap.as_mut_slice() };
             copy_memory(SEGMENT_MAGIC, segment);
             segment[3] = SEGMENT_VERSION;
             LittleEndian::write_u32(&mut segment[4..], seed);
