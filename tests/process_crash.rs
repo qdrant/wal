@@ -15,9 +15,9 @@ extern crate rand;
 extern crate tempdir;
 extern crate wal;
 
+use std::collections::HashMap;
 use std::env;
 use std::process;
-use std::collections::HashMap;
 
 use rand::Rng;
 use wal::test_utils::EntryGenerator;
@@ -45,12 +45,12 @@ fn test() {
     println!("Spawning subprocess; path: {:?}; seed: {}", path, seed);
 
     let exit_code = process::Command::new(env::current_exe().unwrap())
-                                     .env("SEED", format!("{}", seed))
-                                     .env("SEGMENT_PATH", format!("{}", path.display()))
-                                     .status()
-                                     .unwrap()
-                                     .code()
-                                     .unwrap();
+        .env("SEED", format!("{}", seed))
+        .env("SEGMENT_PATH", format!("{}", path.display()))
+        .status()
+        .unwrap()
+        .code()
+        .unwrap();
 
     assert_eq!(EXIT_CODE, exit_code);
 
