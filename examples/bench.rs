@@ -2,7 +2,7 @@ extern crate docopt;
 extern crate histogram;
 extern crate rand;
 extern crate regex;
-extern crate rustc_serialize;
+extern crate serde;
 extern crate time;
 extern crate wal;
 
@@ -13,6 +13,7 @@ use docopt::Docopt;
 use histogram::Histogram;
 use rand::Rng;
 use regex::Regex;
+use serde::Deserialize;
 
 use wal::Segment;
 
@@ -27,7 +28,7 @@ Options:
   -h --help             Show a help message.
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     cmd_append: bool,
 
@@ -40,7 +41,7 @@ struct Args {
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.decode())
+        .and_then(|d| d.deserialize())
         .unwrap_or_else(|e| e.exit());
     if args.cmd_append {
         append(&args);
