@@ -46,18 +46,29 @@ struct Args {
 fn main() {
     let _ = env_logger::init();
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.decode())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.decode())
+        .unwrap_or_else(|e| e.exit());
 
-    let path: PathBuf = PathBuf::from(&args.flag_path).canonicalize().unwrap_or_else(|error| {
-        writeln!(io::stderr(), "Unable to open write ahead log in directory {:?}: {}.",
-                 &args.flag_path, error).unwrap();
-        process::exit(1);
-    });
+    let path: PathBuf = PathBuf::from(&args.flag_path)
+        .canonicalize()
+        .unwrap_or_else(|error| {
+            writeln!(
+                io::stderr(),
+                "Unable to open write ahead log in directory {:?}: {}.",
+                &args.flag_path,
+                error
+            )
+            .unwrap();
+            process::exit(1);
+        });
 
     if !path.is_dir() {
-        writeln!(io::stderr(), "Unable to open write ahead log: path {:?} is not a directory.",
-                 path).unwrap();
+        writeln!(
+            io::stderr(),
+            "Unable to open write ahead log: path {:?} is not a directory.",
+            path
+        )
+        .unwrap();
         process::exit(1);
     }
 
@@ -77,8 +88,13 @@ fn main() {
 
 fn open_wal(path: &Path) -> Wal {
     Wal::open(path).unwrap_or_else(|error| {
-        writeln!(io::stderr(), "Unable to open write ahead log in directory {:?}: {}.",
-                 path, error).unwrap();
+        writeln!(
+            io::stderr(),
+            "Unable to open write ahead log in directory {:?}: {}.",
+            path,
+            error
+        )
+        .unwrap();
         process::exit(1);
     })
 }
@@ -92,10 +108,15 @@ fn entry(wal: Wal, index: u64) {
     match wal.entry(index) {
         Some(entry) => {
             io::stdout().write_all(&*entry).unwrap();
-        },
+        }
         None => {
-            writeln!(io::stderr(), "No entry at index {} in the write ahead log in directory {:?}.",
-                     index, &wal.path()).unwrap();
+            writeln!(
+                io::stderr(),
+                "No entry at index {} in the write ahead log in directory {:?}.",
+                index,
+                &wal.path()
+            )
+            .unwrap();
             process::exit(1);
         }
     }

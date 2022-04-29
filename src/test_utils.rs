@@ -3,8 +3,8 @@ use std::fmt;
 use std::usize;
 
 use rand;
-use rand::{Rng, SeedableRng};
 use rand::distributions::Sample;
+use rand::{Rng, SeedableRng};
 
 use segment;
 
@@ -23,7 +23,6 @@ pub struct EntryGenerator {
 }
 
 impl EntryGenerator {
-
     pub fn new() -> EntryGenerator {
         EntryGenerator::with_segment_capacity(usize::MAX)
     }
@@ -34,8 +33,8 @@ impl EntryGenerator {
 
     pub fn with_segment_capacity(size: usize) -> EntryGenerator {
         let seed: usize = env::var("WAL_TEST_SEED")
-                              .map(|seed| seed.parse::<usize>().unwrap())
-                              .unwrap_or_else(|_| rand::random());
+            .map(|seed| seed.parse::<usize>().unwrap())
+            .unwrap_or_else(|_| rand::random());
         EntryGenerator::with_seed_and_segment_capacity(seed, size)
     }
 
@@ -71,8 +70,11 @@ impl Iterator for EntryGenerator {
 
 impl fmt::Debug for EntryGenerator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "EntryGenerator {{ seed: {}, remaining_size: {} }}",
-               self.seed, self.remaining_size)
+        write!(
+            f,
+            "EntryGenerator {{ seed: {}, remaining_size: {} }}",
+            self.seed, self.remaining_size
+        )
     }
 }
 
@@ -85,10 +87,11 @@ mod test {
     #[test]
     fn entry_generator_distribution() {
         let generator = EntryGenerator::new();
-        let mut sizes: Vec<usize> = generator.into_iter()
-                                         .take(100)
-                                         .map(|entry| entry.len())
-                                         .collect();
+        let mut sizes: Vec<usize> = generator
+            .into_iter()
+            .take(100)
+            .map(|entry| entry.len())
+            .collect();
 
         sizes.sort();
 
@@ -108,12 +111,12 @@ mod test {
     #[test]
     fn entry_generator_size() {
         let generator = EntryGenerator::with_segment_capacity(1023);
-        let len = generator.into_iter()
-                           .fold(segment::segment_overhead(),
-                                 |acc, entry| {
-                                     let len = entry.len();
-                                     acc + len + segment::entry_overhead(len)
-                                 });
+        let len = generator
+            .into_iter()
+            .fold(segment::segment_overhead(), |acc, entry| {
+                let len = entry.len();
+                acc + len + segment::entry_overhead(len)
+            });
 
         assert!(len <= 1023);
     }
@@ -123,7 +126,9 @@ mod test {
         let gen1 = EntryGenerator::with_seed(42);
         let gen2 = EntryGenerator::with_seed(42);
 
-        assert_eq!(gen1.into_iter().take(100).collect::<Vec<_>>(),
-                   gen2.into_iter().take(100).collect::<Vec<_>>());
+        assert_eq!(
+            gen1.into_iter().take(100).collect::<Vec<_>>(),
+            gen2.into_iter().take(100).collect::<Vec<_>>()
+        );
     }
 }

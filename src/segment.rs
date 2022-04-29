@@ -1,13 +1,9 @@
 use std::fmt;
 use std::fs::{self, OpenOptions};
-use std::io::{
-    Error,
-    ErrorKind,
-    Result,
-};
+use std::io::{Error, ErrorKind, Result};
 use std::mem;
-use std::ops::Deref;
 use std::ops;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::thread;
@@ -17,7 +13,7 @@ use crc::crc32;
 use eventual::Future;
 use fs2::FileExt;
 use log;
-use memmap::{Mmap, Protection, MmapViewSync};
+use memmap::{Mmap, MmapViewSync, Protection};
 use rand;
 
 /// The magic bytes and version tag of the segment header.
@@ -117,7 +113,6 @@ pub struct Segment {
 }
 
 impl Segment {
-
     /// Creates a new segment.
     ///
     /// The initial capacity must be at least 8 bytes.
@@ -127,22 +122,29 @@ impl Segment {
     ///
     /// The caller is responsible for flushing the containing directory in order
     /// to guarantee that the segment is durable in the event of a crash.
-    pub fn create<P>(path: P, capacity: usize) -> Result<Segment> where P: AsRef<Path> {
+    pub fn create<P>(path: P, capacity: usize) -> Result<Segment>
+    where
+        P: AsRef<Path>,
+    {
         // Round capacity down to the nearest 8-byte alignment, since the
         // segment would not be able to take advantage of the space.
         let capacity = capacity & !7;
         if capacity < HEADER_LEN {
-            return Err(Error::new(ErrorKind::InvalidInput,
-                                  format!("invalid segment capacity: {}", capacity)));
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid segment capacity: {}", capacity),
+            ));
         }
 
-        let file = OpenOptions::new().read(true).write(true).create(true).open(&path)?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&path)?;
         file.allocate(capacity as u64)?;
 
-        let mut mmap = Mmap::open_with_offset(&file,
-                                                   Protection::ReadWrite,
-                                                   0,
-                                                   capacity)?.into_view_sync();
+        let mut mmap =
+            Mmap::open_with_offset(&file, Protection::ReadWrite, 0, capacity)?.into_view_sync();
         let seed = rand::random();
 
         {
@@ -166,21 +168,28 @@ impl Segment {
     /// Opens the segment file at the specified path.
     ///
     /// An individual file must only be opened by one segment at a time.
-    pub fn open<P>(path: P) -> Result<Segment> where P: AsRef<Path> {
-        let file = OpenOptions::new().read(true).write(true).create(false).open(&path)?;
+    pub fn open<P>(path: P) -> Result<Segment>
+    where
+        P: AsRef<Path>,
+    {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(false)
+            .open(&path)?;
         let capacity = file.metadata()?.len();
         if capacity > usize::max_value() as u64 || capacity < HEADER_LEN as u64 {
-            return Err(Error::new(ErrorKind::InvalidInput,
-                                  format!("invalid segment capacity: {}", capacity)));
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid segment capacity: {}", capacity),
+            ));
         }
 
         // Round capacity down to the nearest 8-byte alignment, since the
         // segment would not be able to take advantage of the space.
         let capacity = capacity as usize & !7;
-        let mmap = Mmap::open_with_offset(&file,
-                                               Protection::ReadWrite,
-                                               0,
-                                               capacity)?.into_view_sync();
+        let mmap =
+            Mmap::open_with_offset(&file, Protection::ReadWrite, 0, capacity)?.into_view_sync();
 
         let mut index = Vec::new();
         let mut crc;
@@ -197,8 +206,10 @@ impl Segment {
             }
 
             if segment[3] != 0 {
-                return Err(Error::new(ErrorKind::InvalidData,
-                                      format!("Segment version unsupported: {}", segment[3])));
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!("Segment version unsupported: {}", segment[3]),
+                ));
             }
 
             crc = LittleEndian::read_u32(&segment[4..]);
@@ -208,12 +219,17 @@ impl Segment {
                 let len = LittleEndian::read_u64(&segment[offset..]) as usize;
                 let padding = padding(len);
                 let padded_len = len + padding;
-                if offset + HEADER_LEN + padded_len + CRC_LEN > capacity { break; }
+                if offset + HEADER_LEN + padded_len + CRC_LEN > capacity {
+                    break;
+                }
 
-                let entry_crc = crc32::update(crc,
-                                              &crc32::CASTAGNOLI_TABLE,
-                                              &segment[offset..offset + HEADER_LEN + padded_len]);
-                if entry_crc != LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]) {
+                let entry_crc = crc32::update(
+                    crc,
+                    &crc32::CASTAGNOLI_TABLE,
+                    &segment[offset..offset + HEADER_LEN + padded_len],
+                );
+                if entry_crc != LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..])
+                {
                     break;
                 }
 
@@ -253,16 +269,15 @@ impl Segment {
     /// Returns the segment entry at the specified index, or `None` if no such
     /// entry exists.
     pub fn entry(&self, index: usize) -> Option<Entry> {
-        self.index
-            .get(index)
-            .map(|&(offset, len)| {
-                let mut view = unsafe { self.mmap.clone() };
-                // restrict only fails on bounds errors, but an invariant of
-                // Segment is that the index always holds valid offset and
-                // length bounds.
-                view.restrict(offset, len).expect("illegal segment offset or length");
-                Entry { view }
-            })
+        self.index.get(index).map(|&(offset, len)| {
+            let mut view = unsafe { self.mmap.clone() };
+            // restrict only fails on bounds errors, but an invariant of
+            // Segment is that the index always holds valid offset and
+            // length bounds.
+            view.restrict(offset, len)
+                .expect("illegal segment offset or length");
+            Entry { view }
+        })
     }
 
     /// Appends an entry to the segment, returning the index of the new entry,
@@ -270,7 +285,10 @@ impl Segment {
     ///
     /// The entry may be immediately read from the log, but it is not guaranteed
     /// to be durably stored on disk until the segment is flushed.
-    pub fn append<T>(&mut self, entry: &T) -> Option<usize> where T: ops::Deref<Target=[u8]> {
+    pub fn append<T>(&mut self, entry: &T) -> Option<usize>
+    where
+        T: ops::Deref<Target = [u8]>,
+    {
         if !self.sufficient_capacity(entry.len()) {
             return None;
         }
@@ -284,18 +302,29 @@ impl Segment {
         let mut crc = self.crc;
 
         LittleEndian::write_u64(&mut self.as_mut_slice()[offset..], entry.len() as u64);
-        copy_memory(entry.deref(), &mut self.as_mut_slice()[offset + HEADER_LEN..]);
+        copy_memory(
+            entry.deref(),
+            &mut self.as_mut_slice()[offset + HEADER_LEN..],
+        );
 
         if padding > 0 {
             let zeros: [u8; 8] = [0; 8];
-            copy_memory(&zeros[..padding],
-                        &mut self.as_mut_slice()[offset + HEADER_LEN + entry.len()..]);
+            copy_memory(
+                &zeros[..padding],
+                &mut self.as_mut_slice()[offset + HEADER_LEN + entry.len()..],
+            );
         }
 
-        crc = crc32::update(crc, &crc32::CASTAGNOLI_TABLE,
-                            &self.as_slice()[offset..offset + HEADER_LEN + padded_len]);
+        crc = crc32::update(
+            crc,
+            &crc32::CASTAGNOLI_TABLE,
+            &self.as_slice()[offset..offset + HEADER_LEN + padded_len],
+        );
 
-        LittleEndian::write_u32(&mut self.as_mut_slice()[offset + HEADER_LEN + padded_len..], crc);
+        LittleEndian::write_u32(
+            &mut self.as_mut_slice()[offset + HEADER_LEN + padded_len..],
+            crc,
+        );
 
         self.crc = crc;
         self.index.push((offset + HEADER_LEN, entry.len()));
@@ -307,7 +336,9 @@ impl Segment {
     /// The entries are not guaranteed to be removed until the segment is
     /// flushed.
     pub fn truncate(&mut self, from: usize) {
-        if from >= self.index.len() { return; }
+        if from >= self.index.len() {
+            return;
+        }
         trace!("{:?}: truncating from position {}", self, from);
 
         // Remove the index entries.
@@ -350,8 +381,13 @@ impl Segment {
             let (complete, future) = Future::pair();
 
             let log_msg = if log_enabled!(log::LogLevel::Debug) {
-                format!("{:?}: async flushing byte range [{}, {})", &self, start, end)
-            } else { String::new() };
+                format!(
+                    "{:?}: async flushing byte range [{}, {})",
+                    &self, start, end
+                )
+            } else {
+                String::new()
+            };
 
             thread::spawn(move || {
                 debug!("{}", log_msg);
@@ -377,16 +413,15 @@ impl Segment {
             info!("{:?}: resizing to {} bytes", self, required_capacity);
             self.flush()?;
             let file = OpenOptions::new()
-                                        .read(true)
-                                        .write(true)
-                                        .create(false)
-                                        .open(&self.path)?;
+                .read(true)
+                .write(true)
+                .create(false)
+                .open(&self.path)?;
             file.allocate(required_capacity as u64)?;
 
-            let mut mmap = Mmap::open_with_offset(&file,
-                                                       Protection::ReadWrite,
-                                                       0,
-                                                       required_capacity)?.into_view_sync();
+            let mut mmap =
+                Mmap::open_with_offset(&file, Protection::ReadWrite, 0, required_capacity)?
+                    .into_view_sync();
             mem::swap(&mut mmap, &mut self.mmap);
         }
         Ok(())
@@ -413,18 +448,18 @@ impl Segment {
     /// Returns the total number of bytes used to store existing entries,
     /// including header and padding overhead.
     pub fn size(&self) -> usize {
-        self.index
-            .last()
-            .map_or(HEADER_LEN, |&(offset, len)| offset + len + padding(len) + CRC_LEN)
+        self.index.last().map_or(HEADER_LEN, |&(offset, len)| {
+            offset + len + padding(len) + CRC_LEN
+        })
     }
 
     /// Returns `true` if the segment has sufficient remaining capacity to
     /// append an entry of size `entry_len`.
     pub fn sufficient_capacity(&self, entry_len: usize) -> bool {
-        (self.capacity() - self.size()).checked_sub(HEADER_LEN + CRC_LEN)
-                                       .map_or(false, |rem| rem >= entry_len + padding(entry_len))
+        (self.capacity() - self.size())
+            .checked_sub(HEADER_LEN + CRC_LEN)
+            .map_or(false, |rem| rem >= entry_len + padding(entry_len))
     }
-
 
     /// Returns the path to the segment file.
     pub fn path(&self) -> &Path {
@@ -435,7 +470,10 @@ impl Segment {
     ///
     /// The caller is responsible for syncing the directory in order to
     /// guarantee that the rename is durable in the event of a crash.
-    pub fn rename<P>(&mut self, path: P) -> Result<()> where P: AsRef<Path> {
+    pub fn rename<P>(&mut self, path: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
         info!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path)?;
         self.path = path.as_ref().to_path_buf();
@@ -451,8 +489,14 @@ impl Segment {
 
 impl fmt::Debug for Segment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Segment {{ path: {:?}, entries: {}, space: ({}/{}) }}",
-               &self.path, self.index.len(), self.size(), self.capacity())
+        write!(
+            f,
+            "Segment {{ path: {:?}, entries: {}, space: ({}/{}) }}",
+            &self.path,
+            self.index.len(),
+            self.size(),
+            self.capacity()
+        )
     }
 }
 
@@ -463,9 +507,7 @@ pub fn copy_memory(src: &[u8], dst: &mut [u8]) {
     let len_src = src.len();
     assert!(dst.len() >= len_src);
     unsafe {
-        ptr::copy_nonoverlapping(src.as_ptr(),
-                                 dst.as_mut_ptr(),
-                                 len_src);
+        ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), len_src);
     }
 }
 
@@ -492,7 +534,7 @@ mod test {
     use env_logger;
     use tempdir;
 
-    use super::{Segment, padding};
+    use super::{padding, Segment};
 
     use test_utils::EntryGenerator;
 
@@ -530,8 +572,8 @@ mod test {
         assert_eq!(0, segment.len());
 
         let entries: Vec<Vec<u8>> = EntryGenerator::with_segment_capacity(segment.capacity())
-                                                   .into_iter()
-                                                   .collect();
+            .into_iter()
+            .collect();
 
         for (idx, entry) in entries.iter().enumerate() {
             assert_eq!(idx, segment.append(entry).unwrap());
@@ -567,17 +609,19 @@ mod test {
     fn test_entries() {
         let _ = env_logger::init();
         let mut segment = create_segment(4096);
-        let entries: &[&[u8]] = &[b"",
-                                  b"0",
-                                  b"01",
-                                  b"012",
-                                  b"0123",
-                                  b"01234",
-                                  b"012345",
-                                  b"0123456",
-                                  b"01234567",
-                                  b"012345678",
-                                  b"0123456789"];
+        let entries: &[&[u8]] = &[
+            b"",
+            b"0",
+            b"01",
+            b"012",
+            b"0123",
+            b"01234",
+            b"012345",
+            b"0123456",
+            b"01234567",
+            b"012345678",
+            b"0123456789",
+        ];
 
         for (index, entry) in entries.iter().enumerate() {
             assert_eq!(index, segment.append(entry).unwrap());
@@ -595,17 +639,19 @@ mod test {
         let mut path = dir.path().to_path_buf();
         path.push("test-open");
 
-        let entries: &[&[u8]] = &[b"",
-                                  b"0",
-                                  b"01",
-                                  b"012",
-                                  b"0123",
-                                  b"01234",
-                                  b"012345",
-                                  b"0123456",
-                                  b"01234567",
-                                  b"012345678",
-                                  b"0123456789"];
+        let entries: &[&[u8]] = &[
+            b"",
+            b"0",
+            b"01",
+            b"012",
+            b"0123",
+            b"01234",
+            b"012345",
+            b"0123456",
+            b"01234567",
+            b"012345678",
+            b"0123456789",
+        ];
 
         {
             let mut segment = Segment::create(&path, 4096).unwrap();
@@ -634,9 +680,7 @@ mod test {
         let mut path = dir.path().to_path_buf();
         path.push("test-overwrite");
 
-        let entries: &[&[u8]] = &[b"abcdefgh",
-                                  b"abcdefgh",
-                                  b"abcdefgh"];
+        let entries: &[&[u8]] = &[b"abcdefgh", b"abcdefgh", b"abcdefgh"];
 
         {
             let mut segment = Segment::create(&path, 4096).unwrap();
@@ -659,6 +703,9 @@ mod test {
         let dir = tempdir::TempDir::new("segment").unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-open-nonexistent");
-        assert_eq!(ErrorKind::NotFound, Segment::open(&path).unwrap_err().kind());
+        assert_eq!(
+            ErrorKind::NotFound,
+            Segment::open(&path).unwrap_err().kind()
+        );
     }
 }

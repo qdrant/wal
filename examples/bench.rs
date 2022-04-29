@@ -40,8 +40,8 @@ struct Args {
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.decode())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.decode())
+        .unwrap_or_else(|e| e.exit());
     if args.cmd_append {
         append(&args);
     }
@@ -73,7 +73,9 @@ fn format_bytes(n: usize) -> String {
 
 fn parse_bytes(s: &str) -> usize {
     let regex = Regex::new(r"(?i)^(\d+(?:\.\d+)?)\s?(k|m|g)?i?b?$").unwrap();
-    let caps = regex.captures(s).expect(&format!("unable to parse byte amount: {}", s));
+    let caps = regex
+        .captures(s)
+        .expect(&format!("unable to parse byte amount: {}", s));
     let n: usize = FromStr::from_str(caps.at(1).unwrap()).unwrap();
 
     match caps.at(2) {
@@ -91,8 +93,12 @@ fn append(args: &Args) {
     let entry_size = parse_bytes(&args.flag_entry_size);
     let segment_size = parse_bytes(&args.flag_segment_size);
 
-    println!("entry size: {}, segment size: {}, batch size: {}",
-             format_bytes(entry_size), format_bytes(segment_size), args.flag_batch);
+    println!(
+        "entry size: {}, segment size: {}, batch size: {}",
+        format_bytes(entry_size),
+        format_bytes(segment_size),
+        args.flag_batch
+    );
 
     let mut segment = Segment::create(path, segment_size).unwrap();
 
@@ -110,13 +116,15 @@ fn append(args: &Args) {
         if args.flag_batch != 0 && entries % args.flag_batch == 0 {
             let start_sync = time::precise_time_ns();
             //future.await().unwrap();
-            sync_hist.increment(time::precise_time_ns() - start_sync).unwrap();
+            sync_hist
+                .increment(time::precise_time_ns() - start_sync)
+                .unwrap();
         }
         let new_time = time::precise_time_ns();
         append_hist.increment(new_time - time).unwrap();
         time = new_time;
         rand::weak_rng().fill_bytes(&mut buf);
-    };
+    }
 
     if args.flag_batch != 0 && entries % args.flag_batch != 0 {
         //segment.flush().await().unwrap();
@@ -138,23 +146,59 @@ fn append(args: &Args) {
     let overhead_amount = segment.len() as usize - data;
     let overhead_rate = (overhead_amount as f64 / (time as f64 / 1_000_000_000f64)) as usize;
 
-    println!("time: {}, data: {} ({}), rate {}/s ({}/s), entries appended: {}",
-             format_duration(time),
-             format_bytes(data),
-             format_bytes(overhead_amount),
-             format_bytes(rate),
-             format_bytes(overhead_rate),
-             entries);
-    println!("append latency:\t\tp50: {:>7},\tp75: {:>7},\tp90: {:>7},\tp95: {:>7},\tp99: {:>7}",
-             append_hist.percentile(0.5).map(format_duration).unwrap_or("na".to_string()),
-             append_hist.percentile(0.75).map(format_duration).unwrap_or("na".to_string()),
-             append_hist.percentile(0.90).map(format_duration).unwrap_or("na".to_string()),
-             append_hist.percentile(0.95).map(format_duration).unwrap_or("na".to_string()),
-             append_hist.percentile(0.99).map(format_duration).unwrap_or("na".to_string()));
-    println!("sync latency:\t\tp50: {:>7},\tp75: {:>7},\tp90: {:>7},\tp95: {:>7},\tp99: {:>7}",
-             sync_hist.percentile(0.5).map(format_duration).unwrap_or("na".to_string()),
-             sync_hist.percentile(0.75).map(format_duration).unwrap_or("na".to_string()),
-             sync_hist.percentile(0.90).map(format_duration).unwrap_or("na".to_string()),
-             sync_hist.percentile(0.95).map(format_duration).unwrap_or("na".to_string()),
-             sync_hist.percentile(0.99).map(format_duration).unwrap_or("na".to_string()));
+    println!(
+        "time: {}, data: {} ({}), rate {}/s ({}/s), entries appended: {}",
+        format_duration(time),
+        format_bytes(data),
+        format_bytes(overhead_amount),
+        format_bytes(rate),
+        format_bytes(overhead_rate),
+        entries
+    );
+    println!(
+        "append latency:\t\tp50: {:>7},\tp75: {:>7},\tp90: {:>7},\tp95: {:>7},\tp99: {:>7}",
+        append_hist
+            .percentile(0.5)
+            .map(format_duration)
+            .unwrap_or("na".to_string()),
+        append_hist
+            .percentile(0.75)
+            .map(format_duration)
+            .unwrap_or("na".to_string()),
+        append_hist
+            .percentile(0.90)
+            .map(format_duration)
+            .unwrap_or("na".to_string()),
+        append_hist
+            .percentile(0.95)
+            .map(format_duration)
+            .unwrap_or("na".to_string()),
+        append_hist
+            .percentile(0.99)
+            .map(format_duration)
+            .unwrap_or("na".to_string())
+    );
+    println!(
+        "sync latency:\t\tp50: {:>7},\tp75: {:>7},\tp90: {:>7},\tp95: {:>7},\tp99: {:>7}",
+        sync_hist
+            .percentile(0.5)
+            .map(format_duration)
+            .unwrap_or("na".to_string()),
+        sync_hist
+            .percentile(0.75)
+            .map(format_duration)
+            .unwrap_or("na".to_string()),
+        sync_hist
+            .percentile(0.90)
+            .map(format_duration)
+            .unwrap_or("na".to_string()),
+        sync_hist
+            .percentile(0.95)
+            .map(format_duration)
+            .unwrap_or("na".to_string()),
+        sync_hist
+            .percentile(0.99)
+            .map(format_duration)
+            .unwrap_or("na".to_string())
+    );
 }
