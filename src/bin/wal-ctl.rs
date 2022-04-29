@@ -1,6 +1,6 @@
 extern crate docopt;
 extern crate env_logger;
-extern crate rustc_serialize;
+extern crate serde;
 extern crate wal;
 
 use std::io::{self, Read, Write};
@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use docopt::Docopt;
+use serde::Deserialize;
 use wal::Wal;
 
 static USAGE: &'static str = "
@@ -33,7 +34,7 @@ Options:
   -h --help         Show this help message.
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     cmd_check: bool,
     cmd_entry: bool,
@@ -46,7 +47,7 @@ struct Args {
 fn main() {
     let _ = env_logger::init();
     let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.decode())
+        .and_then(|d| d.deserialize())
         .unwrap_or_else(|e| e.exit());
 
     let path: PathBuf = PathBuf::from(&args.flag_path)
