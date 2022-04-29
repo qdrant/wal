@@ -77,9 +77,9 @@ fn parse_bytes(s: &str) -> usize {
     let caps = regex
         .captures(s)
         .expect(&format!("unable to parse byte amount: {}", s));
-    let n: usize = FromStr::from_str(caps.at(1).unwrap()).unwrap();
+    let n: usize = FromStr::from_str(caps.get(1).unwrap().as_str()).unwrap();
 
-    match caps.at(2) {
+    match caps.get(2).map(|m| m.as_str()) {
         None => n,
         Some("k") | Some("K") => n * 1_024,
         Some("m") | Some("M") => n * 1_048_576,
