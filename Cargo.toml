@@ -4,7 +4,7 @@ version = "0.1.2"
 authors = ["Dan Burkert <dan@danburkert.com>", "Andrey Vasnetsov <andrey@vasnetsov.com>"]
 
 [dependencies]
-byteorder = "0.4"
+byteorder = "1.4"
 crc = "1"
 eventual = "0.1.4"
 fs2 = "0.4"
