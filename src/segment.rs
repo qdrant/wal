@@ -566,9 +566,13 @@ mod test {
         Segment::create(path, len).unwrap()
     }
 
+    fn init_logger() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
+
     /// Checks that entries can be appended to a segment.
     fn check_append(segment: &mut Segment) {
-        let _ = env_logger::init();
+        init_logger();
         assert_eq!(0, segment.len());
 
         let entries: Vec<Vec<u8>> = EntryGenerator::with_segment_capacity(segment.capacity())
@@ -587,6 +591,7 @@ mod test {
 
     #[test]
     fn test_append() {
+        init_logger();
         check_append(&mut create_segment(8));
         check_append(&mut create_segment(9));
         check_append(&mut create_segment(32));
@@ -600,14 +605,14 @@ mod test {
 
     #[test]
     fn test_create_dir_path() {
-        let _ = env_logger::init();
+        init_logger();
         let dir = tempdir::TempDir::new("segment").unwrap();
         assert!(Segment::open(dir.path()).is_err());
     }
 
     #[test]
     fn test_entries() {
-        let _ = env_logger::init();
+        init_logger();
         let mut segment = create_segment(4096);
         let entries: &[&[u8]] = &[
             b"",
@@ -634,7 +639,7 @@ mod test {
 
     #[test]
     fn test_open() {
-        let _ = env_logger::init();
+        init_logger();
         let dir = tempdir::TempDir::new("segment").unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-open");
@@ -675,7 +680,7 @@ mod test {
     /// the old entries will not be indexed.
     #[test]
     fn test_overwrite() {
-        let _ = env_logger::init();
+        init_logger();
         let dir = tempdir::TempDir::new("segment").unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-overwrite");
@@ -699,7 +704,7 @@ mod test {
     /// Tests that opening a non-existent segment file will fail.
     #[test]
     fn test_open_nonexistent() {
-        let _ = env_logger::init();
+        init_logger();
         let dir = tempdir::TempDir::new("segment").unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-open-nonexistent");

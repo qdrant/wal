@@ -581,10 +581,14 @@ mod test {
 
     use super::{OpenSegment, SegmentCreator, Wal, WalOptions};
 
+    fn init_logger() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
+
     /// Check that entries appended to the write ahead log can be read back.
     #[test]
     fn check_wal() {
-        let _ = env_logger::init();
+        init_logger();
         fn wal(entry_count: usize) -> TestResult {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
@@ -620,7 +624,7 @@ mod test {
     /// Check that the Wal will read previously written entries.
     #[test]
     fn check_reopen() {
-        let _ = env_logger::init();
+        init_logger();
         fn wal(entry_count: usize) -> TestResult {
             let entries = EntryGenerator::new()
                 .into_iter()
@@ -665,7 +669,7 @@ mod test {
 
     #[test]
     fn check_truncate() {
-        let _ = env_logger::init();
+        init_logger();
         fn truncate(entry_count: usize, truncate: usize) -> TestResult {
             if truncate > entry_count {
                 return TestResult::discard();
@@ -708,7 +712,7 @@ mod test {
 
     #[test]
     fn check_prefix_truncate() {
-        let _ = env_logger::init();
+        init_logger();
         fn prefix_truncate(entry_count: usize, until: usize) -> TestResult {
             trace!(
                 "prefix truncate; entry_count: {}, until: {}",
@@ -746,7 +750,7 @@ mod test {
 
     #[test]
     fn test_append() {
-        let _ = env_logger::init();
+        init_logger();
         let dir = tempdir::TempDir::new("wal").unwrap();
         let mut wal = Wal::open(&dir.path()).unwrap();
 
@@ -758,7 +762,7 @@ mod test {
 
     #[test]
     fn test_truncate() {
-        let _ = env_logger::init();
+        init_logger();
         let dir = tempdir::TempDir::new("wal").unwrap();
         // 2 entries should fit in each segment
         let mut wal = Wal::with_options(
@@ -792,7 +796,7 @@ mod test {
     /// Tests that two Wal instances can not coexist for the same directory.
     #[test]
     fn test_exclusive_lock() {
-        let _ = env_logger::init();
+        init_logger();
         let dir = tempdir::TempDir::new("wal").unwrap();
         let wal = Wal::open(&dir.path()).unwrap();
         assert_eq!(
@@ -805,7 +809,7 @@ mod test {
 
     #[test]
     fn test_segment_creator() {
-        let _ = env_logger::init();
+        init_logger();
         let dir = tempdir::TempDir::new("segment").unwrap();
 
         let segments = vec![OpenSegment {
@@ -821,6 +825,7 @@ mod test {
 
     #[test]
     fn test_record_id_preserving() {
+        init_logger();
         let entry_count = 55;
         let dir = tempdir::TempDir::new("wal").unwrap();
         let options = WalOptions {
@@ -857,6 +862,7 @@ mod test {
 
     #[test]
     fn test_offset_after_open() {
+        init_logger();
         let entry_count = 55;
         let dir = tempdir::TempDir::new("wal").unwrap();
         let options = WalOptions {
