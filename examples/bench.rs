@@ -17,7 +17,7 @@ use serde::Deserialize;
 
 use wal::Segment;
 
-static USAGE: &'static str = "
+static USAGE: &str = "
 Usage:
   bench append [--batch=<n>] [--segment-size=<ss>] [--entry-size=<es>] <segment-path>
 
@@ -76,7 +76,7 @@ fn parse_bytes(s: &str) -> usize {
     let regex = Regex::new(r"(?i)^(\d+(?:\.\d+)?)\s?(k|m|g)?i?b?$").unwrap();
     let caps = regex
         .captures(s)
-        .expect(&format!("unable to parse byte amount: {}", s));
+        .unwrap_or_else(|| panic!("unable to parse byte amount: {}", s));
     let n: usize = FromStr::from_str(caps.get(1).unwrap().as_str()).unwrap();
 
     match caps.get(2).map(|m| m.as_str()) {
@@ -112,7 +112,7 @@ fn append(args: &Args) {
     let mut entries = 0usize;
     let mut time: u64 = time::precise_time_ns();
     let start_time: u64 = time;
-    while let Some(_) = segment.append(&buf) {
+    while segment.append(&buf).is_some() {
         entries += 1;
         if args.flag_batch != 0 && entries % args.flag_batch == 0 {
             let start_sync = time::precise_time_ns();

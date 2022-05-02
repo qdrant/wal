@@ -451,13 +451,13 @@ fn open_dir_entry(entry: fs::DirEntry) -> Result<WalSegment> {
     }
 
     let filename = entry.file_name().into_string().map_err(|_| error())?;
-    match &*filename.split('-').collect::<Vec<&str>>() {
-        &["open", ref id] => {
+    match *filename.split('-').collect::<Vec<&str>>() {
+        ["open", id] => {
             let id = u64::from_str(id).map_err(|_| error())?;
             let segment = Segment::open(entry.path())?;
             Ok(WalSegment::Open(OpenSegment { segment, id }))
         }
-        &["closed", ref start] => {
+        ["closed", start] => {
             let start = u64::from_str(start).map_err(|_| error())?;
             let segment = Segment::open(entry.path())?;
             Ok(WalSegment::Closed(ClosedSegment {
@@ -520,11 +520,11 @@ impl SegmentCreator {
 impl Drop for SegmentCreator {
     fn drop(&mut self) {
         drop(self.rx.take());
-        self.thread.take().map(|join_handle| {
+        if let Some(join_handle) = self.thread.take() {
             if let Err(error) = join_handle.join() {
                 warn!("Error while shutting down segment creator: {:?}", error);
             }
-        });
+        }
     }
 }
 
@@ -542,7 +542,7 @@ fn create_loop(
 
     for segment in existing_segments {
         id = segment.id;
-        if let Err(_) = tx.send(segment) {
+        if tx.send(segment).is_err() {
             cont = false;
             break;
         }
