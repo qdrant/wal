@@ -106,8 +106,8 @@ fn append(args: &Args) {
     let mut buf = vec![0; entry_size as usize];
     rand::weak_rng().fill_bytes(&mut buf);
 
-    let mut append_hist = Histogram::new().unwrap();
-    let mut sync_hist = Histogram::new().unwrap();
+    let mut append_hist = Histogram::new();
+    let mut sync_hist = Histogram::new();
 
     let mut entries = 0usize;
     let mut time: u64 = time::precise_time_ns();
