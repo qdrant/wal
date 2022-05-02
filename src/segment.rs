@@ -380,7 +380,7 @@ impl Segment {
             self.set_flush_offset(end);
             let (complete, future) = Future::pair();
 
-            let log_msg = if log_enabled!(log::LogLevel::Debug) {
+            let log_msg = if log_enabled!(log::Level::Debug) {
                 format!(
                     "{:?}: async flushing byte range [{}, {})",
                     &self, start, end
