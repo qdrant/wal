@@ -52,6 +52,12 @@ impl EntryGenerator {
     }
 }
 
+impl Default for EntryGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Iterator for EntryGenerator {
     type Item = Vec<u8>;
     fn next(&mut self) -> Option<Vec<u8>> {
@@ -94,7 +100,7 @@ mod test {
 
         sizes.sort();
 
-        let sum: usize = sizes.iter().fold(0, |acc, size| acc + size);
+        let sum: usize = sizes.iter().sum();
         let mean = sum as f64 / sizes.len() as f64;
         let median = sizes[sizes.len() / 2];
 

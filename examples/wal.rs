@@ -7,7 +7,7 @@ use wal::Wal;
 
 fn main() {
     let _ = env_logger::init();
-    let path = env::args().skip(1).next().unwrap_or(".".to_owned());
+    let path = env::args().nth(1).unwrap_or(".".to_owned());
     println!("path: {}", path);
     let mut wal = Wal::open(&path).unwrap();
 

@@ -11,7 +11,7 @@ use docopt::Docopt;
 use serde::Deserialize;
 use wal::Wal;
 
-static USAGE: &'static str = "
+static USAGE: &str = "
 Commands:
 
   check   Checks that the write ahead log is well-formed, and prints the number
@@ -53,23 +53,18 @@ fn main() {
     let path: PathBuf = PathBuf::from(&args.flag_path)
         .canonicalize()
         .unwrap_or_else(|error| {
-            writeln!(
-                io::stderr(),
+            eprintln!(
                 "Unable to open write ahead log in directory {:?}: {}.",
-                &args.flag_path,
-                error
-            )
-            .unwrap();
+                &args.flag_path, error
+            );
             process::exit(1);
         });
 
     if !path.is_dir() {
-        writeln!(
-            io::stderr(),
+        eprintln!(
             "Unable to open write ahead log: path {:?} is not a directory.",
             path
-        )
-        .unwrap();
+        );
         process::exit(1);
     }
 
@@ -89,13 +84,10 @@ fn main() {
 
 fn open_wal(path: &Path) -> Wal {
     Wal::open(path).unwrap_or_else(|error| {
-        writeln!(
-            io::stderr(),
+        eprintln!(
             "Unable to open write ahead log in directory {:?}: {}.",
-            path,
-            error
-        )
-        .unwrap();
+            path, error
+        );
         process::exit(1);
     })
 }
@@ -111,13 +103,11 @@ fn entry(wal: Wal, index: u64) {
             io::stdout().write_all(&*entry).unwrap();
         }
         None => {
-            writeln!(
-                io::stderr(),
+            eprintln!(
                 "No entry at index {} in the write ahead log in directory {:?}.",
                 index,
                 &wal.path()
-            )
-            .unwrap();
+            );
             process::exit(1);
         }
     }

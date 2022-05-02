@@ -17,7 +17,7 @@ use memmap::{Mmap, MmapViewSync, Protection};
 use rand;
 
 /// The magic bytes and version tag of the segment header.
-const SEGMENT_MAGIC: &'static [u8; 3] = b"wal";
+const SEGMENT_MAGIC: &[u8; 3] = b"wal";
 const SEGMENT_VERSION: u8 = 0;
 
 /// The length of both the segment and entry header.
