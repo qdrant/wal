@@ -1,6 +1,5 @@
 use std::env;
 use std::fmt;
-use std::usize;
 
 use rand;
 use rand::distributions::Sample;
@@ -41,7 +40,7 @@ impl EntryGenerator {
     pub fn with_seed_and_segment_capacity(seed: usize, size: usize) -> EntryGenerator {
         info!("Creating EntryGenerator with seed {}", seed);
         EntryGenerator {
-            seed: seed,
+            seed,
             rng: rand::StdRng::from_seed(&[seed]),
             dist: rand::distributions::Gamma::new(1.25, 25.6),
             remaining_size: size.saturating_sub(segment::segment_overhead()),
