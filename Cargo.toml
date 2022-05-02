@@ -10,7 +10,7 @@ eventual = "0.1.4"
 fs2 = "0.4"
 log = "0.4"
 memmap = "0.2"
-rand = "0.3"
+rand = "0.8"
 time = "0.1"
 
 # Binary dependencies
