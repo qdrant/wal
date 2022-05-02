@@ -21,7 +21,7 @@ serde = { version = "1", features = ["derive"] }
 [dev-dependencies]
 docopt = "1.1"
 env_logger = "0.9"
-histogram = "0.3"
+histogram = "0.6"
 quickcheck = "0.2"
 regex = "1.5"
 rustc-serialize = "0.3"
