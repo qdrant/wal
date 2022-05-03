@@ -2,7 +2,7 @@ use std::env;
 use std::fmt;
 
 use rand;
-use rand::distributions::Sample;
+use rand::distributions::{Distribution, Standard};
 use rand::{Rng, SeedableRng};
 
 use segment;
@@ -11,7 +11,7 @@ pub struct EntryGenerator {
     seed: usize,
 
     /// Random number generator.
-    rng: rand::StdRng,
+    rng: rand::rngs::StdRng,
 
     /// Gamma(shape=1.25, scale=25.6) distribution for generating entry sizes.
     /// Produces values with a mean of 32 bytes and a median of 24 bytes. See
@@ -41,7 +41,7 @@ impl EntryGenerator {
         info!("Creating EntryGenerator with seed {}", seed);
         EntryGenerator {
             seed,
-            rng: rand::StdRng::from_seed(&[seed]),
+            rng: rand::rngs::StdRng::seed_from_u64(seed as u64),
             dist: rand::distributions::Gamma::new(1.25, 25.6),
             remaining_size: size.saturating_sub(segment::segment_overhead()),
         }
@@ -59,7 +59,7 @@ impl Iterator for EntryGenerator {
         let padded_size = size + segment::entry_overhead(size);
         if self.remaining_size >= padded_size {
             self.remaining_size -= padded_size;
-            Some(self.rng.gen_iter().take(size).collect())
+            Some(self.rng.sample_iter(&Standard).take(size).collect())
         } else {
             self.remaining_size = 0;
             None
