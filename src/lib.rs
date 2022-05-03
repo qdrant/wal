@@ -589,7 +589,7 @@ mod test {
     #[test]
     fn check_wal() {
         init_logger();
-        fn wal(entry_count: usize) -> TestResult {
+        fn wal(entry_count: u8) -> TestResult {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
                 &dir.path(),
@@ -601,7 +601,7 @@ mod test {
             .unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
-                .take(entry_count)
+                .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
             for entry in &entries {
@@ -618,17 +618,17 @@ mod test {
             TestResult::passed()
         }
 
-        quickcheck::quickcheck(wal as fn(usize) -> TestResult);
+        quickcheck::quickcheck(wal as fn(u8) -> TestResult);
     }
 
     /// Check that the Wal will read previously written entries.
     #[test]
     fn check_reopen() {
         init_logger();
-        fn wal(entry_count: usize) -> TestResult {
+        fn wal(entry_count: u8) -> TestResult {
             let entries = EntryGenerator::new()
                 .into_iter()
-                .take(entry_count)
+                .take(entry_count as usize)
                 .collect::<Vec<_>>();
             let dir = tempdir::TempDir::new("wal").unwrap();
             {
@@ -664,13 +664,13 @@ mod test {
             TestResult::passed()
         }
 
-        quickcheck::quickcheck(wal as fn(usize) -> TestResult);
+        quickcheck::quickcheck(wal as fn(u8) -> TestResult);
     }
 
     #[test]
     fn check_truncate() {
         init_logger();
-        fn truncate(entry_count: usize, truncate: usize) -> TestResult {
+        fn truncate(entry_count: u8, truncate: u8) -> TestResult {
             if truncate > entry_count {
                 return TestResult::discard();
             }
@@ -685,7 +685,7 @@ mod test {
             .unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
-                .take(entry_count)
+                .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
             for entry in &entries {
@@ -696,7 +696,7 @@ mod test {
 
             wal.truncate(truncate as u64).unwrap();
 
-            for (index, expected) in entries.iter().take(truncate).enumerate() {
+            for (index, expected) in entries.iter().take(truncate as usize).enumerate() {
                 match wal.entry(index as u64) {
                     Some(ref entry) if &entry[..] != &expected[..] => return TestResult::failed(),
                     None => return TestResult::failed(),
@@ -707,13 +707,13 @@ mod test {
             TestResult::from_bool(wal.entry(truncate as u64).is_none())
         }
 
-        quickcheck::quickcheck(truncate as fn(usize, usize) -> TestResult);
+        quickcheck::quickcheck(truncate as fn(u8, u8) -> TestResult);
     }
 
     #[test]
     fn check_prefix_truncate() {
         init_logger();
-        fn prefix_truncate(entry_count: usize, until: usize) -> TestResult {
+        fn prefix_truncate(entry_count: u8, until: u8) -> TestResult {
             trace!(
                 "prefix truncate; entry_count: {}, until: {}",
                 entry_count,
@@ -733,7 +733,7 @@ mod test {
             .unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
-                .take(entry_count)
+                .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
             for entry in &entries {
@@ -742,10 +742,10 @@ mod test {
 
             wal.prefix_truncate(until as u64).unwrap();
 
-            let num_entries = wal.num_entries() as usize;
+            let num_entries = wal.num_entries() as u8;
             TestResult::from_bool(num_entries <= entry_count && num_entries >= entry_count - until)
         }
-        quickcheck::quickcheck(prefix_truncate as fn(usize, usize) -> TestResult);
+        quickcheck::quickcheck(prefix_truncate as fn(u8, u8) -> TestResult);
     }
 
     #[test]
