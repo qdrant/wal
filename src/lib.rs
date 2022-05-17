@@ -404,6 +404,21 @@ impl Wal {
             .get(0)
             .map_or(0, |segment| segment.start_index)
     }
+
+    /// The index of the last entry
+    pub fn last_index(&self) -> u64 {
+        let num_entries = self.num_entries();
+        if num_entries != 0 {
+            self.first_index() + num_entries - 1
+        } else {
+            0
+        }
+    }
+
+    /// Remove all entries
+    pub fn clear(&mut self) -> Result<()> {
+        self.truncate(self.first_index())
+    }
 }
 
 impl fmt::Debug for Wal {
@@ -619,6 +634,68 @@ mod test {
         }
 
         quickcheck::quickcheck(wal as fn(u8) -> TestResult);
+    }
+
+    #[test]
+    fn check_last_index() {
+        init_logger();
+        fn check(entry_count: u8) -> TestResult {
+            let dir = tempdir::TempDir::new("wal").unwrap();
+            let mut wal = Wal::with_options(
+                &dir.path(),
+                &WalOptions {
+                    segment_capacity: 80,
+                    segment_queue_len: 3,
+                },
+            )
+            .unwrap();
+            let entries = EntryGenerator::new()
+                .into_iter()
+                .take(entry_count as usize)
+                .collect::<Vec<_>>();
+
+            for entry in &entries {
+                wal.append(entry).unwrap();
+            }
+            let last_index = wal.last_index();
+            if wal.entry(last_index).is_none() && wal.num_entries() != 0 {
+                return TestResult::failed();
+            }
+            if wal.entry(last_index + 1).is_some() {
+                return TestResult::failed();
+            }
+            TestResult::passed()
+        }
+
+        quickcheck::quickcheck(check as fn(u8) -> TestResult)
+    }
+
+    #[test]
+    fn check_clear() {
+        init_logger();
+        fn check(entry_count: u8) -> TestResult {
+            let dir = tempdir::TempDir::new("wal").unwrap();
+            let mut wal = Wal::with_options(
+                &dir.path(),
+                &WalOptions {
+                    segment_capacity: 80,
+                    segment_queue_len: 3,
+                },
+            )
+            .unwrap();
+            let entries = EntryGenerator::new()
+                .into_iter()
+                .take(entry_count as usize)
+                .collect::<Vec<_>>();
+
+            for entry in &entries {
+                wal.append(entry).unwrap();
+            }
+            wal.clear().unwrap();
+            TestResult::from_bool(wal.num_entries() == 0)
+        }
+
+        quickcheck::quickcheck(check as fn(u8) -> TestResult)
     }
 
     /// Check that the Wal will read previously written entries.
