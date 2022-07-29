@@ -625,7 +625,7 @@ mod test {
 
             for (index, expected) in entries.iter().enumerate() {
                 match wal.entry(index as u64) {
-                    Some(ref entry) if &entry[..] != &expected[..] => return TestResult::failed(),
+                    Some(ref entry) if entry[..] != expected[..] => return TestResult::failed(),
                     None => return TestResult::failed(),
                     _ => (),
                 }
@@ -733,7 +733,7 @@ mod test {
             // Check that all of the entries are present.
             for (index, expected) in entries.iter().enumerate() {
                 match wal.entry(index as u64) {
-                    Some(ref entry) if &entry[..] != &expected[..] => return TestResult::failed(),
+                    Some(ref entry) if entry[..] != expected[..] => return TestResult::failed(),
                     None => return TestResult::failed(),
                     _ => (),
                 }
@@ -775,7 +775,7 @@ mod test {
 
             for (index, expected) in entries.iter().take(truncate as usize).enumerate() {
                 match wal.entry(index as u64) {
-                    Some(ref entry) if &entry[..] != &expected[..] => return TestResult::failed(),
+                    Some(ref entry) if entry[..] != expected[..] => return TestResult::failed(),
                     None => return TestResult::failed(),
                     _ => (),
                 }

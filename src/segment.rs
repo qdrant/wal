@@ -632,8 +632,8 @@ mod test {
             assert_eq!(index, segment.append(entry).unwrap());
         }
 
-        for index in 0..entries.len() {
-            assert_eq!(entries[index], &*segment.entry(index).unwrap());
+        for (index, entry) in entries.iter().enumerate() {
+            assert_eq!(*entry, &*segment.entry(index).unwrap());
         }
     }
 
