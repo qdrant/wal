@@ -9,7 +9,7 @@ use std::ptr;
 use std::thread;
 
 use byteorder::{ByteOrder, LittleEndian};
-use crc::crc32;
+use crc::{Crc, CRC_32_ISCSI};
 use eventual::Future;
 use fs2::FileExt;
 use log;
@@ -26,7 +26,7 @@ const HEADER_LEN: usize = 8;
 /// The length of a CRC value.
 const CRC_LEN: usize = 4;
 
-type Crc = u32;
+pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
 
 pub struct Entry {
     view: MmapViewSync,
@@ -107,7 +107,7 @@ pub struct Segment {
     /// Index of entry offset and lengths.
     index: Vec<(usize, usize)>,
     /// The crc of the last appended entry.
-    crc: Crc,
+    crc: u32,
     /// Offset of last flush.
     flush_offset: usize,
 }
@@ -222,12 +222,9 @@ impl Segment {
                 if offset + HEADER_LEN + padded_len + CRC_LEN > capacity {
                     break;
                 }
-
-                let entry_crc = crc32::update(
-                    crc,
-                    &crc32::CASTAGNOLI_TABLE,
-                    &segment[offset..offset + HEADER_LEN + padded_len],
-                );
+                let mut digest = CASTAGNOLI.digest_with_initial(crc);
+                digest.update(&segment[offset..offset + HEADER_LEN + padded_len]);
+                let entry_crc = digest.finalize();
                 if entry_crc != LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..])
                 {
                     break;
@@ -300,6 +297,7 @@ impl Segment {
         let offset = self.size();
 
         let mut crc = self.crc;
+        let mut digest = CASTAGNOLI.digest_with_initial(crc);
 
         LittleEndian::write_u64(&mut self.as_mut_slice()[offset..], entry.len() as u64);
         copy_memory(
@@ -314,12 +312,8 @@ impl Segment {
                 &mut self.as_mut_slice()[offset + HEADER_LEN + entry.len()..],
             );
         }
-
-        crc = crc32::update(
-            crc,
-            &crc32::CASTAGNOLI_TABLE,
-            &self.as_slice()[offset..offset + HEADER_LEN + padded_len],
-        );
+        digest.update(&self.as_slice()[offset..offset + HEADER_LEN + padded_len]);
+        crc = digest.finalize();
 
         LittleEndian::write_u32(
             &mut self.as_mut_slice()[offset + HEADER_LEN + padded_len..],
