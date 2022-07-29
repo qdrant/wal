@@ -12,7 +12,6 @@ log = "0.4"
 memmap = "0.5.2"
 rand = "0.8.5"
 rand_distr = "0.4.3"
-time = "0.2.27"
 
 # Binary dependencies
 docopt = "1.1"
@@ -27,3 +26,4 @@ quickcheck = "1.0.3"
 regex = "1.5"
 rustc-serialize = "0.3"
 tempdir = "0.3"
+chrono = "0.4.19"

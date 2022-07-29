@@ -1,9 +1,9 @@
+extern crate chrono;
 extern crate docopt;
 extern crate histogram;
 extern crate rand;
 extern crate regex;
 extern crate serde;
-extern crate time;
 extern crate wal;
 
 use std::path::Path;
@@ -47,6 +47,10 @@ fn main() {
     if args.cmd_append {
         append(&args);
     }
+}
+
+pub fn precise_time_ns() -> u64 {
+    chrono::offset::Utc::now().timestamp_nanos() as u64
 }
 
 fn format_duration(n: u64) -> String {
@@ -112,18 +116,16 @@ fn append(args: &Args) {
     let mut sync_hist = Histogram::new();
 
     let mut entries = 0usize;
-    let mut time: u64 = time::precise_time_ns();
+    let mut time: u64 = precise_time_ns();
     let start_time: u64 = time;
     while segment.append(&buf).is_some() {
         entries += 1;
         if args.flag_batch != 0 && entries % args.flag_batch == 0 {
-            let start_sync = time::precise_time_ns();
+            let start_sync = precise_time_ns();
             //future.await().unwrap();
-            sync_hist
-                .increment(time::precise_time_ns() - start_sync)
-                .unwrap();
+            sync_hist.increment(precise_time_ns() - start_sync).unwrap();
         }
-        let new_time = time::precise_time_ns();
+        let new_time = precise_time_ns();
         append_hist.increment(new_time - time).unwrap();
         time = new_time;
         small_rng.fill_bytes(&mut buf);
@@ -131,15 +133,15 @@ fn append(args: &Args) {
 
     if args.flag_batch != 0 && entries % args.flag_batch != 0 {
         //segment.flush().await().unwrap();
-        let new_time = time::precise_time_ns();
+        let new_time = precise_time_ns();
         append_hist.increment(new_time - time).unwrap();
     }
 
-    let end_time = time::precise_time_ns();
+    let end_time = precise_time_ns();
 
     if args.flag_batch == 0 {
         //segment.flush().await().unwrap();
-        let flush_time = time::precise_time_ns() - end_time;
+        let flush_time = precise_time_ns() - end_time;
         println!("final sync latency: {}", format_duration(flush_time));
     }
 

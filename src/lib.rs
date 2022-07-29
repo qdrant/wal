@@ -13,7 +13,6 @@ extern crate rand;
 extern crate rand_distr;
 #[cfg(test)]
 extern crate tempdir;
-extern crate time;
 
 use std::cmp::Ordering;
 use std::fmt;
