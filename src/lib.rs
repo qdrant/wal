@@ -10,6 +10,7 @@ extern crate memmap;
 #[cfg(test)]
 extern crate quickcheck;
 extern crate rand;
+extern crate rand_distr;
 #[cfg(test)]
 extern crate tempdir;
 extern crate time;
