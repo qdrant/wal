@@ -45,7 +45,7 @@ struct Args {
 }
 
 fn main() {
-    let _ = env_logger::init();
+    env_logger::init();
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.deserialize())
         .unwrap_or_else(|e| e.exit());
