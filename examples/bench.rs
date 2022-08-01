@@ -11,8 +11,8 @@ use std::str::FromStr;
 
 use docopt::Docopt;
 use histogram::Histogram;
-use rand::rngs::SmallRng;
-use rand::{FromEntropy, RngCore};
+use rand::rngs::StdRng;
+use rand::{RngCore, SeedableRng};
 use regex::Regex;
 use serde::Deserialize;
 
@@ -105,7 +105,7 @@ fn append(args: &Args) {
     let mut segment = Segment::create(path, segment_size).unwrap();
 
     let mut buf = vec![0; entry_size as usize];
-    let mut small_rng = SmallRng::from_entropy();
+    let mut small_rng = StdRng::from_entropy();
     small_rng.fill_bytes(&mut buf);
 
     let mut append_hist = Histogram::new();
