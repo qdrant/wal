@@ -5,7 +5,7 @@ authors = ["Dan Burkert <dan@danburkert.com>", "Andrey Vasnetsov <andrey@vasnets
 
 [dependencies]
 byteorder = "1.4"
-crc = "1"
+crc = "3"
 eventual = "0.1.4"
 fs2 = "0.4"
 log = "0.4"
