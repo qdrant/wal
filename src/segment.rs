@@ -123,10 +123,14 @@ impl Segment {
     /// The caller is responsible for flushing the containing directory in order
     /// to guarantee that the segment is durable in the event of a crash.
     pub fn create<P>(path: P, capacity: usize) -> Result<Segment>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
-        let file_name = path.as_ref().file_name().and_then(|file_name| file_name.to_str()).expect("Path to WAL segment file provided");
+        let file_name = path
+            .as_ref()
+            .file_name()
+            .and_then(|file_name| file_name.to_str())
+            .expect("Path to WAL segment file provided");
 
         let tmp_file_path = match path.as_ref().parent() {
             Some(parent) => parent.join(format!("tmp-{}", file_name)),
@@ -156,7 +160,6 @@ impl Segment {
 
             let mut mmap =
                 Mmap::open_with_offset(&file, Protection::ReadWrite, 0, capacity)?.into_view_sync();
-
 
             {
                 let segment = unsafe { &mut mmap.as_mut_slice() };
@@ -193,8 +196,8 @@ impl Segment {
     ///
     /// An individual file must only be opened by one segment at a time.
     pub fn open<P>(path: P) -> Result<Segment>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         let file = OpenOptions::new()
             .read(true)
@@ -307,8 +310,8 @@ impl Segment {
     /// The entry may be immediately read from the log, but it is not guaranteed
     /// to be durably stored on disk until the segment is flushed.
     pub fn append<T>(&mut self, entry: &T) -> Option<usize>
-        where
-            T: ops::Deref<Target=[u8]>,
+    where
+        T: ops::Deref<Target = [u8]>,
     {
         if !self.sufficient_capacity(entry.len()) {
             return None;
@@ -489,8 +492,8 @@ impl Segment {
     /// The caller is responsible for syncing the directory in order to
     /// guarantee that the rename is durable in the event of a crash.
     pub fn rename<P>(&mut self, path: P) -> Result<()>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         info!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path)?;
@@ -690,7 +693,6 @@ mod test {
                 panic!("Failed to create segment");
             }
         }
-
 
         let segment = Segment::open(&path).unwrap();
         assert_eq!(capacity, segment.capacity());
