@@ -124,8 +124,9 @@ impl Wal {
 
         for entry in fs::read_dir(&path)? {
             match open_dir_entry(entry?)? {
-                WalSegment::Open(open_segment) => open_segments.push(open_segment),
-                WalSegment::Closed(closed_segment) => closed_segments.push(closed_segment),
+                Some(WalSegment::Open(open_segment)) => open_segments.push(open_segment),
+                Some(WalSegment::Closed(closed_segment)) => closed_segments.push(closed_segment),
+                None => {}
             }
         }
 
@@ -451,7 +452,7 @@ fn close_segment(mut segment: OpenSegment, start_index: u64) -> Result<ClosedSeg
     })
 }
 
-fn open_dir_entry(entry: fs::DirEntry) -> Result<WalSegment> {
+fn open_dir_entry(entry: fs::DirEntry) -> Result<Option<WalSegment>> {
     let metadata = entry.metadata()?;
 
     let error = || {
@@ -466,21 +467,26 @@ fn open_dir_entry(entry: fs::DirEntry) -> Result<WalSegment> {
     }
 
     let filename = entry.file_name().into_string().map_err(|_| error())?;
-    match *filename.split('-').collect::<Vec<&str>>() {
-        ["open", id] => {
+    match filename.split_once('-') {
+        Some(("tmp", _)) => {
+            // remove temporary files.
+            fs::remove_file(entry.path())?;
+            Ok(None)
+        }
+        Some(("open", id)) => {
             let id = u64::from_str(id).map_err(|_| error())?;
             let segment = Segment::open(entry.path())?;
-            Ok(WalSegment::Open(OpenSegment { segment, id }))
+            Ok(Some(WalSegment::Open(OpenSegment { segment, id })))
         }
-        ["closed", start] => {
+        Some(("closed", start)) => {
             let start = u64::from_str(start).map_err(|_| error())?;
             let segment = Segment::open(entry.path())?;
-            Ok(WalSegment::Closed(ClosedSegment {
+            Ok(Some(WalSegment::Closed(ClosedSegment {
                 start_index: start,
                 segment,
-            }))
+            })))
         }
-        _ => Err(error()),
+        _ => Ok(None), // Ignore other files.
     }
 }
 
@@ -589,6 +595,7 @@ mod test {
     use fs2;
     use quickcheck;
     use quickcheck::TestResult;
+    use std::io::Write;
     use tempdir;
 
     use segment::Segment;
@@ -720,6 +727,18 @@ mod test {
                 for entry in &entries {
                     let _ = wal.append(entry);
                 }
+            }
+
+            {
+                // Create fake temp file to simulate a crash.
+                let mut file = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(&dir.path().join("tmp-open-123"))
+                    .unwrap();
+
+                file.write(b"123").unwrap();
             }
 
             let wal = Wal::with_options(
