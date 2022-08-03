@@ -123,9 +123,16 @@ impl Segment {
     /// The caller is responsible for flushing the containing directory in order
     /// to guarantee that the segment is durable in the event of a crash.
     pub fn create<P>(path: P, capacity: usize) -> Result<Segment>
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
+        let file_name = path.as_ref().file_name().and_then(|file_name| file_name.to_str()).expect("Path to WAL segment file provided");
+
+        let tmp_file_path = match path.as_ref().parent() {
+            Some(parent) => parent.join(format!("tmp-{}", file_name)),
+            None => PathBuf::from(format!("tmp-{}", file_name)),
+        };
+
         // Round capacity down to the nearest 8-byte alignment, since the
         // segment would not be able to take advantage of the space.
         let capacity = capacity & !7;
@@ -135,24 +142,41 @@ impl Segment {
                 format!("invalid segment capacity: {}", capacity),
             ));
         }
+        let seed = rand::random();
+
+        {
+            // Prepare properly formatted segment in a temporary file, so in case of failure it won't be corrupted.
+            let file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(&tmp_file_path)?;
+
+            file.allocate(capacity as u64)?;
+
+            let mut mmap =
+                Mmap::open_with_offset(&file, Protection::ReadWrite, 0, capacity)?.into_view_sync();
+
+
+            {
+                let segment = unsafe { &mut mmap.as_mut_slice() };
+                copy_memory(SEGMENT_MAGIC, segment);
+                segment[3] = SEGMENT_VERSION;
+                LittleEndian::write_u32(&mut segment[4..], seed);
+            }
+        };
+
+        // File renames are atomic, so we can safely rename the temporary file to the final file.
+        fs::rename(&tmp_file_path, &path)?;
 
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .open(&path)?;
-        file.allocate(capacity as u64)?;
 
-        let mut mmap =
+        let mmap =
             Mmap::open_with_offset(&file, Protection::ReadWrite, 0, capacity)?.into_view_sync();
-        let seed = rand::random();
-
-        {
-            let segment = unsafe { &mut mmap.as_mut_slice() };
-            copy_memory(SEGMENT_MAGIC, segment);
-            segment[3] = SEGMENT_VERSION;
-            LittleEndian::write_u32(&mut segment[4..], seed);
-        }
 
         let segment = Segment {
             mmap,
@@ -169,8 +193,8 @@ impl Segment {
     ///
     /// An individual file must only be opened by one segment at a time.
     pub fn open<P>(path: P) -> Result<Segment>
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
         let file = OpenOptions::new()
             .read(true)
@@ -201,7 +225,7 @@ impl Segment {
             // the remainder of the file is considered empty.
             let segment = unsafe { mmap.as_slice() };
 
-            if &segment[0..3] != b"wal" {
+            if &segment[0..3] != SEGMENT_MAGIC {
                 return Err(Error::new(ErrorKind::InvalidData, "Illegal segment header"));
             }
 
@@ -283,8 +307,8 @@ impl Segment {
     /// The entry may be immediately read from the log, but it is not guaranteed
     /// to be durably stored on disk until the segment is flushed.
     pub fn append<T>(&mut self, entry: &T) -> Option<usize>
-    where
-        T: ops::Deref<Target = [u8]>,
+        where
+            T: ops::Deref<Target=[u8]>,
     {
         if !self.sufficient_capacity(entry.len()) {
             return None;
@@ -465,8 +489,8 @@ impl Segment {
     /// The caller is responsible for syncing the directory in order to
     /// guarantee that the rename is durable in the event of a crash.
     pub fn rename<P>(&mut self, path: P) -> Result<()>
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
         info!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path)?;
@@ -522,7 +546,6 @@ pub fn segment_overhead() -> usize {
 
 #[cfg(test)]
 mod test {
-
     use std::io::ErrorKind;
 
     use env_logger;
@@ -652,17 +675,25 @@ mod test {
             b"0123456789",
         ];
 
+        let capacity = 4096;
+
         {
-            let mut segment = Segment::create(&path, 4096).unwrap();
-            for (i, entry) in entries.iter().enumerate() {
-                let index = segment.append(entry).unwrap();
-                assert_eq!(i, index);
+            let segment_res = Segment::create(&path, capacity);
+            if let Ok(mut segment) = segment_res {
+                for (i, entry) in entries.iter().enumerate() {
+                    let index = segment.append(entry).unwrap();
+                    assert_eq!(i, index);
+                }
+                segment.flush().unwrap();
+            } else {
+                eprintln!("segment_res = {:#?}", segment_res);
+                panic!("Failed to create segment");
             }
-            segment.flush().unwrap();
         }
 
+
         let segment = Segment::open(&path).unwrap();
-        assert_eq!(4096, segment.capacity());
+        assert_eq!(capacity, segment.capacity());
         assert_eq!(entries.len(), segment.len());
 
         for (index, &entry) in entries.iter().enumerate() {

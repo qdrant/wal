@@ -103,15 +103,15 @@ pub struct Wal {
 
 impl Wal {
     pub fn open<P>(path: P) -> Result<Wal>
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
         Wal::with_options(path, &WalOptions::default())
     }
 
     pub fn with_options<P>(path: P, options: &WalOptions) -> Result<Wal>
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
         debug!("Wal {{ path: {:?} }}: opening", path.as_ref());
 
@@ -124,8 +124,9 @@ impl Wal {
 
         for entry in fs::read_dir(&path)? {
             match open_dir_entry(entry?)? {
-                WalSegment::Open(open_segment) => open_segments.push(open_segment),
-                WalSegment::Closed(closed_segment) => closed_segments.push(closed_segment),
+                Some(WalSegment::Open(open_segment)) => open_segments.push(open_segment),
+                Some(WalSegment::Closed(closed_segment)) => closed_segments.push(closed_segment),
+                None => {}
             }
         }
 
@@ -232,8 +233,8 @@ impl Wal {
     }
 
     pub fn append<T>(&mut self, entry: &T) -> Result<u64>
-    where
-        T: ops::Deref<Target = [u8]>,
+        where
+            T: ops::Deref<Target=[u8]>,
     {
         trace!("{:?}: appending entry of length {}", self, entry.len());
         if !self.open_segment.segment.sufficient_capacity(entry.len()) {
@@ -336,9 +337,9 @@ impl Wal {
         trace!("{:?}: prefix_truncate until entry {}", self, until);
         if until
             <= self
-                .closed_segments
-                .get(0)
-                .map_or(0, |segment| segment.start_index)
+            .closed_segments
+            .get(0)
+            .map_or(0, |segment| segment.start_index)
         {
             // Do nothing, the first entry is already greater than `until`.
         } else if until >= self.open_segment_start_index() {
@@ -392,9 +393,9 @@ impl Wal {
     pub fn num_entries(&self) -> u64 {
         self.open_segment_start_index()
             - self
-                .closed_segments
-                .get(0)
-                .map_or(0, |segment| segment.start_index)
+            .closed_segments
+            .get(0)
+            .map_or(0, |segment| segment.start_index)
             + self.open_segment.segment.len() as u64
     }
 
@@ -451,7 +452,7 @@ fn close_segment(mut segment: OpenSegment, start_index: u64) -> Result<ClosedSeg
     })
 }
 
-fn open_dir_entry(entry: fs::DirEntry) -> Result<WalSegment> {
+fn open_dir_entry(entry: fs::DirEntry) -> Result<Option<WalSegment>> {
     let metadata = entry.metadata()?;
 
     let error = || {
@@ -466,21 +467,26 @@ fn open_dir_entry(entry: fs::DirEntry) -> Result<WalSegment> {
     }
 
     let filename = entry.file_name().into_string().map_err(|_| error())?;
-    match *filename.split('-').collect::<Vec<&str>>() {
-        ["open", id] => {
+    match filename.split_once('-') {
+        Some(("tmp", _)) => {
+            // remove temporary files.
+            fs::remove_file(entry.path())?;
+            Ok(None)
+        }
+        Some(("open", id)) => {
             let id = u64::from_str(id).map_err(|_| error())?;
             let segment = Segment::open(entry.path())?;
-            Ok(WalSegment::Open(OpenSegment { segment, id }))
+            Ok(Some(WalSegment::Open(OpenSegment { segment, id })))
         }
-        ["closed", start] => {
+        Some(("closed", start)) => {
             let start = u64::from_str(start).map_err(|_| error())?;
             let segment = Segment::open(entry.path())?;
-            Ok(WalSegment::Closed(ClosedSegment {
+            Ok(Some(WalSegment::Closed(ClosedSegment {
                 start_index: start,
                 segment,
-            }))
+            })))
         }
-        _ => Err(error()),
+        _ => Ok(None), // Ignore other files.
     }
 }
 
@@ -503,8 +509,8 @@ impl SegmentCreator {
         segment_capacity: usize,
         segment_queue_len: usize,
     ) -> SegmentCreator
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
         let (tx, rx) = sync_channel::<OpenSegment>(segment_queue_len);
 
@@ -585,6 +591,7 @@ fn create_loop(
 
 #[cfg(test)]
 mod test {
+    use std::io::Write;
     use env_logger;
     use fs2;
     use quickcheck;
@@ -613,7 +620,7 @@ mod test {
                     segment_queue_len: 3,
                 },
             )
-            .unwrap();
+                .unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
                 .take(entry_count as usize)
@@ -648,7 +655,7 @@ mod test {
                     segment_queue_len: 3,
                 },
             )
-            .unwrap();
+                .unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
                 .take(entry_count as usize)
@@ -682,7 +689,7 @@ mod test {
                     segment_queue_len: 3,
                 },
             )
-            .unwrap();
+                .unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
                 .take(entry_count as usize)
@@ -716,10 +723,21 @@ mod test {
                         segment_queue_len: 3,
                     },
                 )
-                .unwrap();
+                    .unwrap();
                 for entry in &entries {
                     let _ = wal.append(entry);
                 }
+            }
+
+            {
+                // Create fake temp file to simulate a crash.
+                let mut file = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(&dir.path().join("tmp-open-123")).unwrap();
+
+                file.write(b"123").unwrap();
             }
 
             let wal = Wal::with_options(
@@ -729,7 +747,7 @@ mod test {
                     segment_queue_len: 3,
                 },
             )
-            .unwrap();
+                .unwrap();
             // Check that all of the entries are present.
             for (index, expected) in entries.iter().enumerate() {
                 match wal.entry(index as u64) {
@@ -759,7 +777,7 @@ mod test {
                     segment_queue_len: 3,
                 },
             )
-            .unwrap();
+                .unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
                 .take(entry_count as usize)
@@ -807,7 +825,7 @@ mod test {
                     segment_queue_len: 3,
                 },
             )
-            .unwrap();
+                .unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
                 .take(entry_count as usize)
@@ -849,7 +867,7 @@ mod test {
                 segment_queue_len: 3,
             },
         )
-        .unwrap();
+            .unwrap();
 
         let entry: [u8; 2000] = [42u8; 2000];
 
