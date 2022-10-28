@@ -596,15 +596,11 @@ fn create_loop(
 
 #[cfg(test)]
 mod test {
-    use env_logger;
-    use fs2;
-    use quickcheck;
     use quickcheck::TestResult;
     use std::io::Write;
-    use tempdir;
 
-    use segment::Segment;
-    use test_utils::EntryGenerator;
+    use crate::segment::Segment;
+    use crate::test_utils::EntryGenerator;
 
     use super::{OpenSegment, SegmentCreator, Wal, WalOptions};
 

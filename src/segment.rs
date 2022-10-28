@@ -11,9 +11,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use crc::{Crc, CRC_32_ISCSI};
 use eventual::Future;
 use fs2::FileExt;
-use log;
 use memmap::{Mmap, MmapViewSync, Protection};
-use rand;
 
 /// The magic bytes and version tag of the segment header.
 const SEGMENT_MAGIC: &[u8; 3] = b"wal";
@@ -550,12 +548,9 @@ pub fn segment_overhead() -> usize {
 mod test {
     use std::io::ErrorKind;
 
-    use env_logger;
-    use tempdir;
-
     use super::{padding, Segment};
 
-    use test_utils::EntryGenerator;
+    use crate::test_utils::EntryGenerator;
 
     #[test]
     fn test_pad_len() {

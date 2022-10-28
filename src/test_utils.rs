@@ -5,7 +5,7 @@ use rand;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Standard};
 
-use segment;
+use crate::segment;
 
 pub struct EntryGenerator {
     seed: usize,
@@ -87,7 +87,7 @@ impl fmt::Debug for EntryGenerator {
 mod test {
 
     use super::EntryGenerator;
-    use segment;
+    use crate::segment;
 
     #[test]
     fn entry_generator_distribution() {
