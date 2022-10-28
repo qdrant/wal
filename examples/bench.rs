@@ -1,11 +1,3 @@
-extern crate chrono;
-extern crate docopt;
-extern crate histogram;
-extern crate rand;
-extern crate regex;
-extern crate serde;
-extern crate wal;
-
 use std::path::Path;
 use std::str::FromStr;
 

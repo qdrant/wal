@@ -1,3 +1,4 @@
+use log::{debug, info, log_enabled, trace};
 use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::{Error, ErrorKind, Result};

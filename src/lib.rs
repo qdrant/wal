@@ -1,19 +1,8 @@
-extern crate byteorder;
-extern crate crc;
-#[cfg(test)]
-extern crate env_logger;
-extern crate eventual;
-extern crate fs2;
-#[macro_use]
 extern crate log;
-extern crate memmap;
-#[cfg(test)]
-extern crate quickcheck;
-extern crate rand;
-extern crate rand_distr;
-#[cfg(test)]
-extern crate tempdir;
 
+use eventual::{Async, Future};
+use fs2::FileExt;
+use log::{debug, info, trace, warn};
 use std::cmp::Ordering;
 use std::fmt;
 use std::fs::{self, File};
@@ -25,9 +14,6 @@ use std::result;
 use std::str::FromStr;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::thread;
-
-use eventual::{Async, Future};
-use fs2::FileExt;
 
 pub use segment::{Entry, Segment};
 
@@ -596,6 +582,7 @@ fn create_loop(
 
 #[cfg(test)]
 mod test {
+    use log::trace;
     use quickcheck::TestResult;
     use std::io::Write;
 
