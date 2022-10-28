@@ -6,8 +6,8 @@ use std::env;
 use wal::Wal;
 
 fn main() {
-    let _ = env_logger::init();
-    let path = env::args().nth(1).unwrap_or(".".to_owned());
+    env_logger::init();
+    let path = env::args().nth(1).unwrap_or_else(|| ".".to_owned());
     println!("path: {}", path);
     let mut wal = Wal::open(&path).unwrap();
 

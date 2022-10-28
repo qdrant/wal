@@ -141,20 +141,25 @@ impl Wal {
             ..
         } in &closed_segments
         {
-            if start_index > next_start_index {
-                return Err(Error::new(
-                    ErrorKind::InvalidData,
-                    format!(
-                        "missing segment(s) containing wal entries {} to {}",
-                        next_start_index, start_index
-                    ),
-                ));
-            } else if start_index < next_start_index {
-                // TODO: figure out what to do here.
-                // Current thinking is the previous segment should be truncated.
-                unimplemented!()
+            match start_index.cmp(&next_start_index) {
+                Ordering::Less => {
+                    // TODO: figure out what to do here.
+                    // Current thinking is the previous segment should be truncated.
+                    unimplemented!()
+                }
+                Ordering::Equal => {
+                    next_start_index = start_index + segment.len() as u64;
+                }
+                Ordering::Greater => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        format!(
+                            "missing segment(s) containing wal entries {} to {}",
+                            next_start_index, start_index
+                        ),
+                    ));
+                }
             }
-            next_start_index = start_index + segment.len() as u64;
         }
 
         // Validate the open segments.
@@ -738,7 +743,7 @@ mod test {
                     .open(&dir.path().join("tmp-open-123"))
                     .unwrap();
 
-                file.write(b"123").unwrap();
+                let _ = file.write(b"123").unwrap();
             }
 
             let wal = Wal::with_options(

@@ -165,45 +165,45 @@ fn append(args: &Args) {
         append_hist
             .percentile(0.5)
             .map(format_duration)
-            .unwrap_or("na".to_string()),
+            .unwrap_or_else(|_| "na".to_string()),
         append_hist
             .percentile(0.75)
             .map(format_duration)
-            .unwrap_or("na".to_string()),
+            .unwrap_or_else(|_| "na".to_string()),
         append_hist
             .percentile(0.90)
             .map(format_duration)
-            .unwrap_or("na".to_string()),
+            .unwrap_or_else(|_| "na".to_string()),
         append_hist
             .percentile(0.95)
             .map(format_duration)
-            .unwrap_or("na".to_string()),
+            .unwrap_or_else(|_| "na".to_string()),
         append_hist
             .percentile(0.99)
             .map(format_duration)
-            .unwrap_or("na".to_string())
+            .unwrap_or_else(|_| "na".to_string())
     );
     println!(
         "sync latency:\t\tp50: {:>7},\tp75: {:>7},\tp90: {:>7},\tp95: {:>7},\tp99: {:>7}",
         sync_hist
             .percentile(0.5)
             .map(format_duration)
-            .unwrap_or("na".to_string()),
+            .unwrap_or_else(|_| "na".to_string()),
         sync_hist
             .percentile(0.75)
             .map(format_duration)
-            .unwrap_or("na".to_string()),
+            .unwrap_or_else(|_| "na".to_string()),
         sync_hist
             .percentile(0.90)
             .map(format_duration)
-            .unwrap_or("na".to_string()),
+            .unwrap_or_else(|_| "na".to_string()),
         sync_hist
             .percentile(0.95)
             .map(format_duration)
-            .unwrap_or("na".to_string()),
+            .unwrap_or_else(|_| "na".to_string()),
         sync_hist
             .percentile(0.99)
             .map(format_duration)
-            .unwrap_or("na".to_string())
+            .unwrap_or_else(|_| "na".to_string())
     );
 }

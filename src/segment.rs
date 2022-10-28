@@ -2,7 +2,6 @@ use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::{Error, ErrorKind, Result};
 use std::mem;
-use std::ops;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::ptr;
@@ -205,7 +204,7 @@ impl Segment {
             .create(false)
             .open(&path)?;
         let capacity = file.metadata()?.len();
-        if capacity > usize::max_value() as u64 || capacity < HEADER_LEN as u64 {
+        if capacity > usize::MAX as u64 || capacity < HEADER_LEN as u64 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 format!("invalid segment capacity: {}", capacity),
@@ -311,7 +310,7 @@ impl Segment {
     /// to be durably stored on disk until the segment is flushed.
     pub fn append<T>(&mut self, entry: &T) -> Option<usize>
     where
-        T: ops::Deref<Target = [u8]>,
+        T: Deref<Target = [u8]>,
     {
         if !self.sufficient_capacity(entry.len()) {
             return None;
