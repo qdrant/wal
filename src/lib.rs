@@ -1,5 +1,6 @@
 extern crate log;
 
+use crossbeam_channel::{Receiver, Sender};
 use eventual::{Async, Future};
 use fs2::FileExt;
 use log::{debug, info, trace, warn};
@@ -12,7 +13,6 @@ use std::ops;
 use std::path::{Path, PathBuf};
 use std::result;
 use std::str::FromStr;
-use crossbeam_channel::{Receiver, Sender};
 use std::thread;
 
 pub use segment::{Entry, Segment};
