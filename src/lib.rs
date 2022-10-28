@@ -12,7 +12,7 @@ use std::ops;
 use std::path::{Path, PathBuf};
 use std::result;
 use std::str::FromStr;
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use crossbeam_channel::{Receiver, Sender};
 use std::thread;
 
 pub use segment::{Entry, Segment};
@@ -503,7 +503,7 @@ impl SegmentCreator {
     where
         P: AsRef<Path>,
     {
-        let (tx, rx) = sync_channel::<OpenSegment>(segment_queue_len);
+        let (tx, rx) = crossbeam_channel::bounded(segment_queue_len);
 
         let dir = dir.as_ref().to_path_buf();
         let thread = thread::spawn(move || create_loop(tx, dir, segment_capacity, existing));
@@ -541,7 +541,7 @@ impl Drop for SegmentCreator {
 }
 
 fn create_loop(
-    tx: SyncSender<OpenSegment>,
+    tx: Sender<OpenSegment>,
     mut path: PathBuf,
     capacity: usize,
     mut existing_segments: Vec<OpenSegment>,
