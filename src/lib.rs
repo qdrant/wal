@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::result;
 use std::str::FromStr;
 use std::thread;
-use tokio::runtime::Runtime;
 
 pub use segment::{Entry, Segment};
 
@@ -89,14 +88,18 @@ pub struct Wal {
 }
 
 impl Wal {
-    pub fn open<P>(path: P) -> Result<Wal>
+    pub fn open<P>(path: P, runtime_handle: tokio::runtime::Handle) -> Result<Wal>
     where
         P: AsRef<Path>,
     {
-        Wal::with_options(path, &WalOptions::default())
+        Wal::with_options(path, runtime_handle, &WalOptions::default())
     }
 
-    pub fn with_options<P>(path: P, options: &WalOptions) -> Result<Wal>
+    pub fn with_options<P>(
+        path: P,
+        runtime_handle: tokio::runtime::Handle,
+        options: &WalOptions,
+    ) -> Result<Wal>
     where
         P: AsRef<Path>,
     {
@@ -189,10 +192,6 @@ impl Wal {
             Some(segment) => segment,
             None => creator.next()?,
         };
-
-        // TODO inject runtime from constructor
-        let runtime = Runtime::new().unwrap();
-        let runtime_handle = runtime.handle().clone();
 
         let wal = Wal {
             open_segment,
@@ -595,6 +594,7 @@ mod test {
     use log::trace;
     use quickcheck::TestResult;
     use std::io::Write;
+    use tokio::runtime::{Handle, Runtime};
 
     use crate::segment::Segment;
     use crate::test_utils::EntryGenerator;
@@ -605,6 +605,11 @@ mod test {
         let _ = env_logger::builder().is_test(true).try_init();
     }
 
+    fn test_async_runtime() -> Handle {
+        let runtime = Runtime::new().unwrap();
+        runtime.handle().clone()
+    }
+
     /// Check that entries appended to the write ahead log can be read back.
     #[test]
     fn check_wal() {
@@ -613,6 +618,7 @@ mod test {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
+                test_async_runtime(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -648,6 +654,7 @@ mod test {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
+                test_async_runtime(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -682,6 +689,7 @@ mod test {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
+                test_async_runtime(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -716,6 +724,7 @@ mod test {
             {
                 let mut wal = Wal::with_options(
                     dir.path(),
+                    test_async_runtime(),
                     &WalOptions {
                         segment_capacity: 80,
                         segment_queue_len: 3,
@@ -741,6 +750,7 @@ mod test {
 
             let wal = Wal::with_options(
                 dir.path(),
+                test_async_runtime(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -771,6 +781,7 @@ mod test {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
+                test_async_runtime(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -819,6 +830,7 @@ mod test {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
+                test_async_runtime(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -846,7 +858,7 @@ mod test {
     fn test_append() {
         init_logger();
         let dir = tempdir::TempDir::new("wal").unwrap();
-        let mut wal = Wal::open(dir.path()).unwrap();
+        let mut wal = Wal::open(dir.path(), test_async_runtime()).unwrap();
 
         let entry: &[u8] = &[42u8; 4096];
         for _ in 1..10 {
@@ -861,6 +873,7 @@ mod test {
         // 2 entries should fit in each segment
         let mut wal = Wal::with_options(
             dir.path(),
+            test_async_runtime(),
             &WalOptions {
                 segment_capacity: 4096,
                 segment_queue_len: 3,
@@ -891,14 +904,15 @@ mod test {
     #[test]
     fn test_exclusive_lock() {
         init_logger();
+        let handle = test_async_runtime();
         let dir = tempdir::TempDir::new("wal").unwrap();
-        let wal = Wal::open(dir.path()).unwrap();
+        let wal = Wal::open(dir.path(), handle.clone()).unwrap();
         assert_eq!(
             fs2::lock_contended_error().kind(),
-            Wal::open(dir.path()).unwrap_err().kind()
+            Wal::open(dir.path(), handle.clone()).unwrap_err().kind()
         );
         drop(wal);
-        assert!(Wal::open(dir.path()).is_ok());
+        assert!(Wal::open(dir.path(), handle).is_ok());
     }
 
     #[test]
@@ -927,7 +941,7 @@ mod test {
             segment_queue_len: 3,
         };
 
-        let mut wal = Wal::with_options(dir.path(), &options).unwrap();
+        let mut wal = Wal::with_options(dir.path(), test_async_runtime(), &options).unwrap();
         let entries = EntryGenerator::new()
             .into_iter()
             .take(entry_count)
@@ -963,9 +977,10 @@ mod test {
             segment_capacity: 512,
             segment_queue_len: 3,
         };
+        let runtime = test_async_runtime();
         let start_index;
         {
-            let mut wal = Wal::with_options(dir.path(), &options).unwrap();
+            let mut wal = Wal::with_options(dir.path(), runtime.clone(), &options).unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
                 .take(entry_count)
@@ -979,7 +994,7 @@ mod test {
             assert_eq!(start_index, wal.open_segment_start_index());
         }
         {
-            let wal2 = Wal::with_options(dir.path(), &options).unwrap();
+            let wal2 = Wal::with_options(dir.path(), runtime, &options).unwrap();
             assert_eq!(start_index, wal2.open_segment_start_index());
         }
     }

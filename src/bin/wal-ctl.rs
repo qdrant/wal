@@ -4,6 +4,7 @@ use std::process;
 
 use docopt::Docopt;
 use serde::Deserialize;
+use tokio::runtime::{Handle, Runtime};
 use wal::Wal;
 
 static USAGE: &str = "
@@ -63,7 +64,10 @@ fn main() {
         process::exit(1);
     }
 
-    let wal = open_wal(&path);
+    let runtime = Runtime::new().unwrap();
+    let runtime_handle = runtime.handle().clone();
+
+    let wal = open_wal(&path, runtime_handle);
 
     if args.cmd_check {
         check(wal);
@@ -77,8 +81,8 @@ fn main() {
     }
 }
 
-fn open_wal(path: &Path) -> Wal {
-    Wal::open(path).unwrap_or_else(|error| {
+fn open_wal(path: &Path, runtime_handle: Handle) -> Wal {
+    Wal::open(path, runtime_handle).unwrap_or_else(|error| {
         eprintln!(
             "Unable to open write ahead log in directory {:?}: {}.",
             path, error

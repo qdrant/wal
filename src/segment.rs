@@ -406,7 +406,7 @@ impl Segment {
                 String::new()
             };
 
-            let handle = runtime.spawn(async move {
+            let handle = runtime.spawn_blocking(move || {
                 debug!("{}", log_msg);
                 view.restrict(start, end - start).and_then(|_| view.flush())
             });
