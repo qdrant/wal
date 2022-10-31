@@ -1,5 +1,4 @@
 use crossbeam_channel::{Receiver, Sender};
-use eventual::{Async, Future};
 use fs2::FileExt;
 use log::{debug, info, trace, warn};
 use std::cmp::Ordering;
@@ -12,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::result;
 use std::str::FromStr;
 use std::thread;
+use tokio::runtime::Runtime;
 
 pub use segment::{Entry, Segment};
 
@@ -82,7 +82,10 @@ pub struct Wal {
 
     /// Tracks the flush status of recently closed segments between user calls
     /// to `Wal::flush`.
-    flush: Option<Future<(), Error>>,
+    flush: Option<tokio::task::JoinHandle<Result<()>>>,
+
+    /// Runtime to run async. flush
+    runtime_handle: tokio::runtime::Handle,
 }
 
 impl Wal {
@@ -187,6 +190,10 @@ impl Wal {
             None => creator.next()?,
         };
 
+        // TODO inject runtime from constructor
+        let runtime = Runtime::new().unwrap();
+        let runtime_handle = runtime.handle().clone();
+
         let wal = Wal {
             open_segment,
             closed_segments,
@@ -194,6 +201,7 @@ impl Wal {
             dir,
             path: path.as_ref().to_path_buf(),
             flush: None,
+            runtime_handle,
         };
         info!("{:?}: opened", wal);
         Ok(wal)
@@ -204,12 +212,16 @@ impl Wal {
         let mut segment = self.creator.next()?;
         mem::swap(&mut self.open_segment, &mut segment);
 
-        self.flush = Some(
-            self.flush
-                .take()
-                .unwrap_or_else(|| Future::of(()))
-                .and(segment.segment.flush_async()),
-        );
+        // run current flush
+        if let Some(flush) = self.flush.take() {
+            if flush.is_finished() {
+                // next flush handle
+                self.flush = segment.segment.flush_async(self.runtime_handle.clone());
+            }
+        } else {
+            // initiate flush handle
+            self.flush = segment.segment.flush_async(self.runtime_handle.clone());
+        };
 
         let start_index = self.open_segment_start_index();
         self.closed_segments

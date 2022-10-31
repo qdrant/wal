@@ -6,13 +6,12 @@ use std::mem;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::ptr;
-use std::thread;
 
 use byteorder::{ByteOrder, LittleEndian};
 use crc::{Crc, CRC_32_ISCSI};
-use eventual::Future;
 use fs2::FileExt;
 use memmap::{Mmap, MmapViewSync, Protection};
+use tokio::runtime::Handle;
 
 /// The magic bytes and version tag of the segment header.
 const SEGMENT_MAGIC: &[u8; 3] = b"wal";
@@ -387,17 +386,16 @@ impl Segment {
     }
 
     /// Flushes recently written entries to durable storage.
-    pub fn flush_async(&mut self) -> Future<(), Error> {
+    pub fn flush_async(&mut self, runtime: Handle) -> Option<tokio::task::JoinHandle<Result<()>>> {
         let start = self.flush_offset();
         let end = self.size();
         assert!(start <= end);
 
         if start == end {
-            Future::of(())
+            None
         } else {
             let mut view = unsafe { self.mmap.clone() };
             self.set_flush_offset(end);
-            let (complete, future) = Future::pair();
 
             let log_msg = if log_enabled!(log::Level::Debug) {
                 format!(
@@ -408,14 +406,11 @@ impl Segment {
                 String::new()
             };
 
-            thread::spawn(move || {
+            let handle = runtime.spawn(async move {
                 debug!("{}", log_msg);
-                match view.restrict(start, end - start).and_then(|_| view.flush()) {
-                    Ok(_) => complete.complete(()),
-                    Err(error) => complete.fail(error),
-                }
+                view.restrict(start, end - start).and_then(|_| view.flush())
             });
-            future
+            Some(handle)
         }
     }
 
