@@ -602,7 +602,7 @@ mod test {
         fn wal(entry_count: u8) -> TestResult {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
-                &dir.path(),
+                dir.path(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -637,7 +637,7 @@ mod test {
         fn check(entry_count: u8) -> TestResult {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
-                &dir.path(),
+                dir.path(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -671,7 +671,7 @@ mod test {
         fn check(entry_count: u8) -> TestResult {
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
-                &dir.path(),
+                dir.path(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -705,7 +705,7 @@ mod test {
             let dir = tempdir::TempDir::new("wal").unwrap();
             {
                 let mut wal = Wal::with_options(
-                    &dir.path(),
+                    dir.path(),
                     &WalOptions {
                         segment_capacity: 80,
                         segment_queue_len: 3,
@@ -730,7 +730,7 @@ mod test {
             }
 
             let wal = Wal::with_options(
-                &dir.path(),
+                dir.path(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -760,7 +760,7 @@ mod test {
             }
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
-                &dir.path(),
+                dir.path(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -808,7 +808,7 @@ mod test {
             }
             let dir = tempdir::TempDir::new("wal").unwrap();
             let mut wal = Wal::with_options(
-                &dir.path(),
+                dir.path(),
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
@@ -836,7 +836,7 @@ mod test {
     fn test_append() {
         init_logger();
         let dir = tempdir::TempDir::new("wal").unwrap();
-        let mut wal = Wal::open(&dir.path()).unwrap();
+        let mut wal = Wal::open(dir.path()).unwrap();
 
         let entry: &[u8] = &[42u8; 4096];
         for _ in 1..10 {
@@ -850,7 +850,7 @@ mod test {
         let dir = tempdir::TempDir::new("wal").unwrap();
         // 2 entries should fit in each segment
         let mut wal = Wal::with_options(
-            &dir.path(),
+            dir.path(),
             &WalOptions {
                 segment_capacity: 4096,
                 segment_queue_len: 3,
@@ -882,13 +882,13 @@ mod test {
     fn test_exclusive_lock() {
         init_logger();
         let dir = tempdir::TempDir::new("wal").unwrap();
-        let wal = Wal::open(&dir.path()).unwrap();
+        let wal = Wal::open(dir.path()).unwrap();
         assert_eq!(
             fs2::lock_contended_error().kind(),
-            Wal::open(&dir.path()).unwrap_err().kind()
+            Wal::open(dir.path()).unwrap_err().kind()
         );
         drop(wal);
-        assert!(Wal::open(&dir.path()).is_ok());
+        assert!(Wal::open(dir.path()).is_ok());
     }
 
     #[test]
@@ -901,7 +901,7 @@ mod test {
             segment: Segment::create(&dir.path().join("open-3"), 1024).unwrap(),
         }];
 
-        let mut creator = SegmentCreator::new(&dir.path(), segments, 1024, 1);
+        let mut creator = SegmentCreator::new(dir.path(), segments, 1024, 1);
         for i in 3..10 {
             assert_eq!(i, creator.next().unwrap().id);
         }
@@ -917,7 +917,7 @@ mod test {
             segment_queue_len: 3,
         };
 
-        let mut wal = Wal::with_options(&dir.path(), &options).unwrap();
+        let mut wal = Wal::with_options(dir.path(), &options).unwrap();
         let entries = EntryGenerator::new()
             .into_iter()
             .take(entry_count)
@@ -955,7 +955,7 @@ mod test {
         };
         let start_index;
         {
-            let mut wal = Wal::with_options(&dir.path(), &options).unwrap();
+            let mut wal = Wal::with_options(dir.path(), &options).unwrap();
             let entries = EntryGenerator::new()
                 .into_iter()
                 .take(entry_count)
@@ -969,7 +969,7 @@ mod test {
             assert_eq!(start_index, wal.open_segment_start_index());
         }
         {
-            let wal2 = Wal::with_options(&dir.path(), &options).unwrap();
+            let wal2 = Wal::with_options(dir.path(), &options).unwrap();
             assert_eq!(start_index, wal2.open_segment_start_index());
         }
     }

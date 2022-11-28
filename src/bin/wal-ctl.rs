@@ -100,7 +100,7 @@ fn check(wal: Wal) {
 fn entry(wal: Wal, index: u64) {
     match wal.entry(index) {
         Some(entry) => {
-            io::stdout().write_all(&*entry).unwrap();
+            io::stdout().write_all(&entry).unwrap();
         }
         None => {
             eprintln!(
