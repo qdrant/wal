@@ -1,6 +1,3 @@
-extern crate env_logger;
-extern crate wal;
-
 use std::env;
 
 use wal::Wal;

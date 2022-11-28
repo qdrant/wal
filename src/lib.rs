@@ -1,5 +1,3 @@
-extern crate log;
-
 use crossbeam_channel::{Receiver, Sender};
 use eventual::{Async, Future};
 use fs2::FileExt;

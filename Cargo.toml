@@ -22,9 +22,8 @@ serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 docopt = "1.1"
-env_logger = "0.10"
 histogram = "0.6"
 quickcheck = "1.0.3"
 regex = "1.5"
 tempdir = "0.3"
-chrono = "0.4.19"
+chrono = "0.4.23"

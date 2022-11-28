@@ -9,11 +9,7 @@
 //!    the segment based on the seed.
 //! 4. The subprocess aborts without closing resources or cleaning up state.
 //! 5. The test process reads the entries from the segment, ensuring that no
-//!    corruption or data loss has occured.
-
-extern crate rand;
-extern crate tempdir;
-extern crate wal;
+//!    corruption or data loss has occurred.
 
 use std::collections::HashMap;
 use std::env;

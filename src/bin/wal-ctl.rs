@@ -1,8 +1,3 @@
-extern crate docopt;
-extern crate env_logger;
-extern crate serde;
-extern crate wal;
-
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process;
