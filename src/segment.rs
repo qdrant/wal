@@ -1,4 +1,4 @@
-use log::{debug, info, log_enabled, trace};
+use log::{debug, error, info, log_enabled, trace};
 use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::{Error, ErrorKind, Result};
@@ -494,7 +494,10 @@ impl Segment {
         P: AsRef<Path>,
     {
         info!("{:?}: renaming file to {:?}", self, path.as_ref());
-        fs::rename(&self.path, &path)?;
+        fs::rename(&self.path, &path).map_err(|e| {
+            error!("{:?}: failed to rename segment {}", self.path, e);
+            e
+        })?;
         self.path = path.as_ref().to_path_buf();
         Ok(())
     }
@@ -502,7 +505,10 @@ impl Segment {
     /// Deletes the segment file.
     pub fn delete(self) -> Result<()> {
         info!("{:?}: deleting file", self);
-        fs::remove_file(&self.path)
+        fs::remove_file(&self.path).map_err(|e| {
+            error!("{:?}: failed to delete segment {}", self, e);
+            e
+        })
     }
 }
 
