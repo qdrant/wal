@@ -82,7 +82,7 @@ pub struct Wal {
 
     /// Tracks the flush status of recently closed segments between user calls
     /// to `Wal::flush`.
-    flush: Option<Future<(), Error>>,
+    flush_closed_segment: Option<Future<(), Error>>,
 }
 
 impl Wal {
@@ -193,7 +193,7 @@ impl Wal {
             creator,
             dir,
             path: path.as_ref().to_path_buf(),
-            flush: None,
+            flush_closed_segment: None,
         };
         info!("{:?}: opened", wal);
         Ok(wal)
@@ -204,8 +204,8 @@ impl Wal {
         let mut segment = self.creator.next()?;
         mem::swap(&mut self.open_segment, &mut segment);
 
-        self.flush = Some(
-            self.flush
+        self.flush_closed_segment = Some(
+            self.flush_closed_segment
                 .take()
                 .unwrap_or_else(|| Future::of(()))
                 .and(segment.segment.flush_async()),
@@ -232,9 +232,14 @@ impl Wal {
             }
             self.open_segment.segment.ensure_capacity(entry.len())?;
         }
-
         Ok(self.open_segment_start_index()
             + self.open_segment.segment.append(entry).unwrap() as u64)
+    }
+
+    pub fn flush_open_segments(&mut self) -> Result<()> {
+        trace!("{:?}: flushing open segments", self);
+        self.open_segment.segment.flush()?;
+        Ok(())
     }
 
     /// Retrieve the entry with the provided index from the log.

@@ -371,6 +371,7 @@ impl Segment {
 
     /// Flushes recently written entries to durable storage.
     pub fn flush(&mut self) -> Result<()> {
+        info!("flush sync {:?}", self.path);
         let start = self.flush_offset;
         let end = self.size();
         assert!(start <= end);
@@ -388,6 +389,7 @@ impl Segment {
 
     /// Flushes recently written entries to durable storage.
     pub fn flush_async(&mut self) -> Future<(), Error> {
+        info!("flush async {:?}", self.path);
         let start = self.flush_offset();
         let end = self.size();
         assert!(start <= end);
