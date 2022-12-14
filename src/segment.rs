@@ -1,4 +1,5 @@
 use log::{debug, error, info, log_enabled, trace};
+use std::cmp::Ordering;
 use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::{Error, ErrorKind, Result};
@@ -374,16 +375,25 @@ impl Segment {
         trace!("{:?}: flushing", self);
         let start = self.flush_offset;
         let end = self.size();
-        assert!(start <= end, "start = {}, end = {}", start, end);
 
-        if start == end {
-            Ok(())
-        } else {
-            debug!("{:?}: flushing byte range [{}, {})", self, start, end);
-            let mut view = unsafe { self.mmap.clone() };
-            self.set_flush_offset(end);
-            view.restrict(start, end - start)?;
-            view.flush()
+        match start.cmp(&end) {
+            Ordering::Equal => Ok(()), // nothing to flush
+            Ordering::Less => {
+                // flush new elements added since last flush
+                debug!("{:?}: flushing byte range [{}, {})", self, start, end);
+                let mut view = unsafe { self.mmap.clone() };
+                self.set_flush_offset(end);
+                view.restrict(start, end - start)?;
+                view.flush()
+            }
+            Ordering::Greater => {
+                // most likely truncated in between flushes
+                // register new flush offset & flush the whole segment
+                debug!("{:?}: flushing after truncation", self);
+                let view = unsafe { self.mmap.clone() };
+                self.set_flush_offset(end);
+                view.flush()
+            }
         }
     }
 
@@ -392,32 +402,55 @@ impl Segment {
         trace!("{:?}: async flushing", self);
         let start = self.flush_offset();
         let end = self.size();
-        assert!(start <= end, "start = {}, end = {}", start, end);
 
-        if start == end {
-            Future::of(())
-        } else {
-            let mut view = unsafe { self.mmap.clone() };
-            self.set_flush_offset(end);
-            let (complete, future) = Future::pair();
+        match start.cmp(&end) {
+            Ordering::Equal => Future::of(()), // nothing to flush
+            Ordering::Less => {
+                // flush new elements added since last flush
+                let mut view = unsafe { self.mmap.clone() };
+                self.set_flush_offset(end);
+                let (complete, future) = Future::pair();
 
-            let log_msg = if log_enabled!(log::Level::Debug) {
-                format!(
-                    "{:?}: async flushing byte range [{}, {})",
-                    &self, start, end
-                )
-            } else {
-                String::new()
-            };
+                let log_msg = if log_enabled!(log::Level::Debug) {
+                    format!(
+                        "{:?}: async flushing byte range [{}, {})",
+                        &self, start, end
+                    )
+                } else {
+                    String::new()
+                };
 
-            thread::spawn(move || {
-                debug!("{}", log_msg);
-                match view.restrict(start, end - start).and_then(|_| view.flush()) {
-                    Ok(_) => complete.complete(()),
-                    Err(error) => complete.fail(error),
-                }
-            });
-            future
+                thread::spawn(move || {
+                    debug!("{}", log_msg);
+                    match view.restrict(start, end - start).and_then(|_| view.flush()) {
+                        Ok(_) => complete.complete(()),
+                        Err(error) => complete.fail(error),
+                    }
+                });
+                future
+            }
+            Ordering::Greater => {
+                // most likely truncated in between flushes
+                // register new flush offset & flush the whole segment
+                let view = unsafe { self.mmap.clone() };
+                self.set_flush_offset(end);
+                let (complete, future) = Future::pair();
+
+                let log_msg = if log_enabled!(log::Level::Debug) {
+                    format!("{:?}: async flushing after truncation", &self)
+                } else {
+                    String::new()
+                };
+
+                thread::spawn(move || {
+                    debug!("{}", log_msg);
+                    match view.flush() {
+                        Ok(_) => complete.complete(()),
+                        Err(error) => complete.fail(error),
+                    }
+                });
+                future
+            }
         }
     }
 
@@ -518,9 +551,10 @@ impl fmt::Debug for Segment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Segment {{ path: {:?}, entries: {}, space: ({}/{}) }}",
+            "Segment {{ path: {:?}, flush_offset: {}, entries: {}, space: ({}/{}) }}",
             &self.path,
-            self.index.len(),
+            self.flush_offset,
+            self.len(),
             self.size(),
             self.capacity()
         )
