@@ -371,9 +371,10 @@ impl Segment {
 
     /// Flushes recently written entries to durable storage.
     pub fn flush(&mut self) -> Result<()> {
+        trace!("{:?}: flushing", self);
         let start = self.flush_offset;
         let end = self.size();
-        assert!(start <= end);
+        assert!(start <= end, "start = {}, end = {}", start, end);
 
         if start == end {
             Ok(())
@@ -388,9 +389,10 @@ impl Segment {
 
     /// Flushes recently written entries to durable storage.
     pub fn flush_async(&mut self) -> Future<(), Error> {
+        trace!("{:?}: async flushing", self);
         let start = self.flush_offset();
         let end = self.size();
-        assert!(start <= end);
+        assert!(start <= end, "start = {}, end = {}", start, end);
 
         if start == end {
             Future::of(())

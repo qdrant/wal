@@ -237,6 +237,12 @@ impl Wal {
             + self.open_segment.segment.append(entry).unwrap() as u64)
     }
 
+    pub fn flush_open_segment(&mut self) -> Result<()> {
+        trace!("{:?}: flushing open segments", self);
+        self.open_segment.segment.flush()?;
+        Ok(())
+    }
+
     /// Retrieve the entry with the provided index from the log.
     pub fn entry(&self, index: u64) -> Option<Entry> {
         let open_start_index = self.open_segment_start_index();
