@@ -296,7 +296,9 @@ impl Wal {
                             let segment = &mut self.closed_segments[index];
                             segment
                                 .segment
-                                .truncate((from - segment.start_index) as usize)
+                                .truncate((from - segment.start_index) as usize);
+                            // flushing closed segment after truncation
+                            segment.segment.flush()?;
                         }
                         if index + 1 < self.closed_segments.len() {
                             for segment in self.closed_segments.drain(index + 1..) {
@@ -879,6 +881,92 @@ mod test {
             }
             wal.truncate(0).unwrap();
         }
+    }
+
+    #[test]
+    fn test_truncate_flush() {
+        init_logger();
+        let dir = tempdir::TempDir::new("wal").unwrap();
+        // 2 entries should fit in each segment
+        let mut wal = Wal::with_options(
+            dir.path(),
+            &WalOptions {
+                segment_capacity: 4096,
+                segment_queue_len: 3,
+            },
+        )
+        .unwrap();
+
+        let entry: [u8; 2000] = [42u8; 2000];
+        // wal is empty
+        assert!(wal.entry(0).is_none());
+
+        // add 10 entries
+        for i in 0..10 {
+            assert_eq!(i, wal.append(&&entry[..]).unwrap());
+        }
+
+        // 4 closed segments
+        assert_eq!(wal.num_entries(), 10);
+        assert_eq!(wal.first_index(), 0);
+        assert_eq!(wal.last_index(), 9);
+        assert_eq!(wal.closed_segments.len(), 4); // 4 x 2 entries
+        assert_eq!(wal.closed_segments[0].segment.len(), 2);
+        assert_eq!(wal.closed_segments[1].segment.len(), 2);
+        assert_eq!(wal.closed_segments[2].segment.len(), 2);
+        assert_eq!(wal.closed_segments[3].segment.len(), 2);
+        assert_eq!(wal.open_segment.segment.len(), 2); // 1 x 2 entries
+
+        // first flush to set `flush_offset
+        wal.flush_open_segment().unwrap();
+
+        // content unchanged after flushing
+        assert_eq!(wal.num_entries(), 10);
+        assert_eq!(wal.first_index(), 0);
+        assert_eq!(wal.last_index(), 9);
+        assert_eq!(wal.closed_segments.len(), 4); // 4 x 2 entries
+        assert_eq!(wal.closed_segments[0].segment.len(), 2);
+        assert_eq!(wal.closed_segments[1].segment.len(), 2);
+        assert_eq!(wal.closed_segments[2].segment.len(), 2);
+        assert_eq!(wal.closed_segments[3].segment.len(), 2);
+        assert_eq!(wal.open_segment.segment.len(), 2); // 1 x 2 entries
+
+        // truncate half of it
+        wal.truncate(5).unwrap();
+
+        // assert truncation
+        for i in 5..10 {
+            assert!(wal.entry(i).is_none());
+        }
+
+        // flush again with `flush_offset` > segment size
+        wal.flush_open_segment().unwrap();
+
+        assert_eq!(wal.num_entries(), 5); // 5 entries removed
+        assert_eq!(wal.first_index(), 0);
+        assert_eq!(wal.last_index(), 4);
+        assert_eq!(wal.closed_segments.len(), 3); // (0, 1) + (2, 3) + (4, empty slot)
+        assert_eq!(wal.closed_segments[0].segment.len(), 2);
+        assert_eq!(wal.closed_segments[1].segment.len(), 2);
+        assert_eq!(wal.closed_segments[2].segment.len(), 1);
+        assert_eq!(wal.open_segment.segment.len(), 0); // empty open segment
+
+        // add 10 more entries
+        for i in 0..5 {
+            assert_eq!(i + 5, wal.append(&&entry[..]).unwrap());
+        }
+
+        // 5 closed segments
+        assert_eq!(wal.num_entries(), 10);
+        assert_eq!(wal.first_index(), 0);
+        assert_eq!(wal.last_index(), 9);
+        assert_eq!(wal.closed_segments.len(), 5);
+        assert_eq!(wal.closed_segments[0].segment.len(), 2);
+        assert_eq!(wal.closed_segments[1].segment.len(), 2);
+        assert_eq!(wal.closed_segments[2].segment.len(), 1); // previously half truncated
+        assert_eq!(wal.closed_segments[3].segment.len(), 2);
+        assert_eq!(wal.closed_segments[4].segment.len(), 2);
+        assert_eq!(wal.open_segment.segment.len(), 1);
     }
 
     /// Tests that two Wal instances can not coexist for the same directory.
