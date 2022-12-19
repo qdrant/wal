@@ -296,7 +296,9 @@ impl Wal {
                             let segment = &mut self.closed_segments[index];
                             segment
                                 .segment
-                                .truncate((from - segment.start_index) as usize)
+                                .truncate((from - segment.start_index) as usize);
+                            // flushing closed segment after truncation
+                            segment.segment.flush()?;
                         }
                         if index + 1 < self.closed_segments.len() {
                             for segment in self.closed_segments.drain(index + 1..) {
