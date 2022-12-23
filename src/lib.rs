@@ -243,6 +243,11 @@ impl Wal {
         Ok(())
     }
 
+    pub fn flush_open_segment_async(&mut self) -> Future<(), Error> {
+        trace!("{:?}: flushing open segments", self);
+        self.open_segment.segment.flush_async()
+    }
+
     /// Retrieve the entry with the provided index from the log.
     pub fn entry(&self, index: u64) -> Option<Entry> {
         let open_start_index = self.open_segment_start_index();
