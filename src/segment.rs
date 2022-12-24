@@ -11,7 +11,6 @@ use std::thread;
 
 use byteorder::{ByteOrder, LittleEndian};
 use crc::{Crc, CRC_32_ISCSI};
-use eventual::Future;
 use fs2::FileExt;
 use memmap::{Mmap, MmapViewSync, Protection};
 
@@ -122,8 +121,8 @@ impl Segment {
     /// The caller is responsible for flushing the containing directory in order
     /// to guarantee that the segment is durable in the event of a crash.
     pub fn create<P>(path: P, capacity: usize) -> Result<Segment>
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
         let file_name = path
             .as_ref()
@@ -195,8 +194,8 @@ impl Segment {
     ///
     /// An individual file must only be opened by one segment at a time.
     pub fn open<P>(path: P) -> Result<Segment>
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
         let file = OpenOptions::new()
             .read(true)
@@ -309,8 +308,8 @@ impl Segment {
     /// The entry may be immediately read from the log, but it is not guaranteed
     /// to be durably stored on disk until the segment is flushed.
     pub fn append<T>(&mut self, entry: &T) -> Option<usize>
-    where
-        T: Deref<Target = [u8]>,
+        where
+            T: Deref<Target=[u8]>,
     {
         if !self.sufficient_capacity(entry.len()) {
             return None;
@@ -398,18 +397,17 @@ impl Segment {
     }
 
     /// Flushes recently written entries to durable storage.
-    pub fn flush_async(&mut self) -> Future<(), Error> {
+    pub fn flush_async(&mut self) -> thread::JoinHandle<Result<()>> {
         trace!("{:?}: async flushing", self);
         let start = self.flush_offset();
         let end = self.size();
 
         match start.cmp(&end) {
-            Ordering::Equal => Future::of(()), // nothing to flush
+            Ordering::Equal => thread::spawn(move || { Ok(()) }), // nothing to flush
             Ordering::Less => {
                 // flush new elements added since last flush
                 let mut view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
-                let (complete, future) = Future::pair();
 
                 let log_msg = if log_enabled!(log::Level::Debug) {
                     format!(
@@ -422,19 +420,14 @@ impl Segment {
 
                 thread::spawn(move || {
                     debug!("{}", log_msg);
-                    match view.restrict(start, end - start).and_then(|_| view.flush()) {
-                        Ok(_) => complete.complete(()),
-                        Err(error) => complete.fail(error),
-                    }
-                });
-                future
+                    view.restrict(start, end - start).and_then(|_| view.flush())
+                })
             }
             Ordering::Greater => {
                 // most likely truncated in between flushes
                 // register new flush offset & flush the whole segment
                 let view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
-                let (complete, future) = Future::pair();
 
                 let log_msg = if log_enabled!(log::Level::Debug) {
                     format!("{:?}: async flushing after truncation", &self)
@@ -444,12 +437,8 @@ impl Segment {
 
                 thread::spawn(move || {
                     debug!("{}", log_msg);
-                    match view.flush() {
-                        Ok(_) => complete.complete(()),
-                        Err(error) => complete.fail(error),
-                    }
-                });
-                future
+                    view.flush()
+                })
             }
         }
     }
@@ -525,8 +514,8 @@ impl Segment {
     /// The caller is responsible for syncing the directory in order to
     /// guarantee that the rename is durable in the event of a crash.
     pub fn rename<P>(&mut self, path: P) -> Result<()>
-    where
-        P: AsRef<Path>,
+        where
+            P: AsRef<Path>,
     {
         info!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path).map_err(|e| {

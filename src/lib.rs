@@ -1,5 +1,4 @@
 use crossbeam_channel::{Receiver, Sender};
-use eventual::{Async, Future};
 use fs2::FileExt;
 use log::{debug, info, trace, warn};
 use std::cmp::Ordering;
@@ -82,7 +81,7 @@ pub struct Wal {
 
     /// Tracks the flush status of recently closed segments between user calls
     /// to `Wal::flush`.
-    flush: Option<Future<(), Error>>,
+    flush: Option<thread::JoinHandle<Result<()>>>,
 }
 
 impl Wal {
@@ -204,12 +203,11 @@ impl Wal {
         let mut segment = self.creator.next()?;
         mem::swap(&mut self.open_segment, &mut segment);
 
-        self.flush = Some(
-            self.flush
-                .take()
-                .unwrap_or_else(|| Future::of(()))
-                .and(segment.segment.flush_async()),
-        );
+        if let Some(flush) =  self.flush.take() {
+            flush.join().map_err(|err| Error::new(ErrorKind::Other, format!("wal flush thread panicked: {:?}", err)))??;
+        };
+
+        self.flush = Some(segment.segment.flush_async());
 
         let start_index = self.open_segment_start_index();
         self.closed_segments
@@ -243,7 +241,7 @@ impl Wal {
         Ok(())
     }
 
-    pub fn flush_open_segment_async(&mut self) -> Future<(), Error> {
+    pub fn flush_open_segment_async(&mut self) -> thread::JoinHandle<Result<()>> {
         trace!("{:?}: flushing open segments", self);
         self.open_segment.segment.flush_async()
     }

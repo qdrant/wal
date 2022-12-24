@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 byteorder = "1.4"
 crc = "3"
-eventual = "0.1.4"
 fs2 = "0.4"
 log = "0.4"
 memmap = "0.5.2"
