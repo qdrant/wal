@@ -732,7 +732,7 @@ mod test {
                     .read(true)
                     .write(true)
                     .create(true)
-                    .open(&dir.path().join("tmp-open-123"))
+                    .open(dir.path().join("tmp-open-123"))
                     .unwrap();
 
                 let _ = file.write(b"123").unwrap();
@@ -993,7 +993,7 @@ mod test {
 
         let segments = vec![OpenSegment {
             id: 3,
-            segment: Segment::create(&dir.path().join("open-3"), 1024).unwrap(),
+            segment: Segment::create(dir.path().join("open-3"), 1024).unwrap(),
         }];
 
         let mut creator = SegmentCreator::new(dir.path(), segments, 1024, 1);

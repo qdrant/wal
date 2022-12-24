@@ -100,7 +100,7 @@ fn append(args: &Args) {
 
     let mut segment = Segment::create(path, segment_size).unwrap();
 
-    let mut buf = vec![0; entry_size as usize];
+    let mut buf = vec![0; entry_size];
     let mut small_rng = StdRng::from_entropy();
     small_rng.fill_bytes(&mut buf);
 
@@ -140,7 +140,7 @@ fn append(args: &Args) {
     let time = end_time - start_time;
     let data = entries * entry_size;
     let rate = (data as f64 / (time as f64 / 1_000_000_000f64)) as usize;
-    let overhead_amount = segment.len() as usize - data;
+    let overhead_amount = segment.len() - data;
     let overhead_rate = (overhead_amount as f64 / (time as f64 / 1_000_000_000f64)) as usize;
 
     println!(

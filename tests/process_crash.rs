@@ -59,7 +59,7 @@ fn test() {
 }
 
 fn subprocess(path: String, seed: usize) {
-    let mut segment = wal::Segment::create(path, SEGMENT_CAPACITY as usize).unwrap();
+    let mut segment = wal::Segment::create(path, SEGMENT_CAPACITY).unwrap();
 
     for entry in EntryGenerator::with_seed_and_segment_capacity(seed, SEGMENT_CAPACITY) {
         segment.append(&entry).expect("segment capacity exhausted");
