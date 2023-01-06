@@ -361,7 +361,8 @@ impl Segment {
         trace!("{:?}: truncating from position {}", self, from);
 
         // Remove the index entries.
-        let _ = self.index.drain(from..);
+        let deleted = self.index.drain(from..).count();
+        trace!("{:?}: truncated {} entries", self, deleted);
 
         // And overwrite the existing data so that we will not read the data back after a crash.
         let size = self.size();
@@ -376,7 +377,10 @@ impl Segment {
         let end = self.size();
 
         match start.cmp(&end) {
-            Ordering::Equal => Ok(()), // nothing to flush
+            Ordering::Equal => {
+                debug!("{:?}: nothing to flush", self);
+                Ok(())
+            }, // nothing to flush
             Ordering::Less => {
                 // flush new elements added since last flush
                 debug!("{:?}: flushing byte range [{}, {})", self, start, end);
