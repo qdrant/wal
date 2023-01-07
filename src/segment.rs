@@ -250,8 +250,10 @@ impl Segment {
                 let mut digest = CASTAGNOLI.digest_with_initial(crc);
                 digest.update(&segment[offset..offset + HEADER_LEN + padded_len]);
                 let entry_crc = digest.finalize();
-                if entry_crc != LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..])
+                let stored_crc = LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]);
+                if entry_crc != stored_crc
                 {
+                    log::warn!("CRC mismatch at offset {}: {} != {}", offset, entry_crc, stored_crc);
                     break;
                 }
 
@@ -350,6 +352,17 @@ impl Segment {
         Some(self.index.len() - 1)
     }
 
+    fn _read_seed_crc(&self) -> u32 {
+        LittleEndian::read_u32(&self.as_slice()[4..])
+    }
+
+    fn _read_entry_crc(&self, entry_id: usize) -> u32 {
+        let (offset, len) = self.index[entry_id];
+        let padding = padding(len);
+        let padded_len = len + padding;
+        LittleEndian::read_u32(&self.as_slice()[offset + padded_len..])
+    }
+
     /// Truncates the entries in the segment beginning with `from`.
     ///
     /// The entries are not guaranteed to be removed until the segment is
@@ -363,6 +376,14 @@ impl Segment {
         // Remove the index entries.
         let deleted = self.index.drain(from..).count();
         trace!("{:?}: truncated {} entries", self, deleted);
+
+        // Update the CRC.
+        if self.index.is_empty() {
+            self.crc = self._read_seed_crc(); // Seed
+        } else {
+            // Read CRC of the last entry.
+            self.crc = self._read_entry_crc(self.index.len() - 1);
+        }
 
         // And overwrite the existing data so that we will not read the data back after a crash.
         let size = self.size();
