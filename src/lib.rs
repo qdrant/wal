@@ -978,7 +978,7 @@ mod test {
         assert_eq!(wal.closed_segments[2].segment.len(), 1); // 4 empty slot due to truncation
         assert_eq!(wal.closed_segments[3].segment.len(), 2); // 5, 6
         assert_eq!(wal.closed_segments[4].segment.len(), 2); // 7, 8
-        assert_eq!(wal.open_segment.segment.len(), 1);       // 9
+        assert_eq!(wal.open_segment.segment.len(), 1); // 9
 
         eprintln!("wal: {:?}", wal);
         eprintln!("wal open: {:?}", wal.open_segment);

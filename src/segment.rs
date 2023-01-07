@@ -250,10 +250,15 @@ impl Segment {
                 let mut digest = CASTAGNOLI.digest_with_initial(crc);
                 digest.update(&segment[offset..offset + HEADER_LEN + padded_len]);
                 let entry_crc = digest.finalize();
-                let stored_crc = LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]);
-                if entry_crc != stored_crc
-                {
-                    log::warn!("CRC mismatch at offset {}: {} != {}", offset, entry_crc, stored_crc);
+                let stored_crc =
+                    LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]);
+                if entry_crc != stored_crc {
+                    log::warn!(
+                        "CRC mismatch at offset {}: {} != {}",
+                        offset,
+                        entry_crc,
+                        stored_crc
+                    );
                     break;
                 }
 
@@ -401,7 +406,7 @@ impl Segment {
             Ordering::Equal => {
                 debug!("{:?}: nothing to flush", self);
                 Ok(())
-            }, // nothing to flush
+            } // nothing to flush
             Ordering::Less => {
                 // flush new elements added since last flush
                 debug!("{:?}: flushing byte range [{}, {})", self, start, end);
