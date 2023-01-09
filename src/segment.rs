@@ -186,7 +186,7 @@ impl Segment {
             crc: seed,
             flush_offset: 0,
         };
-        info!("{:?}: created", segment);
+        debug!("{:?}: created", segment);
         Ok(segment)
     }
 
@@ -275,7 +275,7 @@ impl Segment {
             crc,
             flush_offset: 0,
         };
-        info!("{:?}: opened", segment);
+        debug!("{:?}: opened", segment);
         Ok(segment)
     }
 
@@ -404,12 +404,12 @@ impl Segment {
 
         match start.cmp(&end) {
             Ordering::Equal => {
-                debug!("{:?}: nothing to flush", self);
+                trace!("{:?}: nothing to flush", self);
                 Ok(())
             } // nothing to flush
             Ordering::Less => {
                 // flush new elements added since last flush
-                debug!("{:?}: flushing byte range [{}, {})", self, start, end);
+                trace!("{:?}: flushing byte range [{}, {})", self, start, end);
                 let mut view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
                 view.restrict(start, end - start)?;
@@ -418,7 +418,7 @@ impl Segment {
             Ordering::Greater => {
                 // most likely truncated in between flushes
                 // register new flush offset & flush the whole segment
-                debug!("{:?}: flushing after truncation", self);
+                trace!("{:?}: flushing after truncation", self);
                 let view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
                 view.flush()
@@ -439,7 +439,7 @@ impl Segment {
                 let mut view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
 
-                let log_msg = if log_enabled!(log::Level::Debug) {
+                let log_msg = if log_enabled!(log::Level::Trace) {
                     format!(
                         "{:?}: async flushing byte range [{}, {})",
                         &self, start, end
@@ -449,7 +449,7 @@ impl Segment {
                 };
 
                 thread::spawn(move || {
-                    debug!("{}", log_msg);
+                    trace!("{}", log_msg);
                     view.restrict(start, end - start).and_then(|_| view.flush())
                 })
             }
@@ -459,14 +459,14 @@ impl Segment {
                 let view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
 
-                let log_msg = if log_enabled!(log::Level::Debug) {
+                let log_msg = if log_enabled!(log::Level::Trace) {
                     format!("{:?}: async flushing after truncation", &self)
                 } else {
                     String::new()
                 };
 
                 thread::spawn(move || {
-                    debug!("{}", log_msg);
+                    trace!("{}", log_msg);
                     view.flush()
                 })
             }
@@ -483,7 +483,7 @@ impl Segment {
         // Sanity check the 8-byte alignment invariant.
         assert_eq!(required_capacity & !7, required_capacity);
         if required_capacity > self.capacity() {
-            info!("{:?}: resizing to {} bytes", self, required_capacity);
+            debug!("{:?}: resizing to {} bytes", self, required_capacity);
             self.flush()?;
             let file = OpenOptions::new()
                 .read(true)
@@ -547,7 +547,7 @@ impl Segment {
     where
         P: AsRef<Path>,
     {
-        info!("{:?}: renaming file to {:?}", self, path.as_ref());
+        debug!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path).map_err(|e| {
             error!("{:?}: failed to rename segment {}", self.path, e);
             e
@@ -558,7 +558,7 @@ impl Segment {
 
     /// Deletes the segment file.
     pub fn delete(self) -> Result<()> {
-        info!("{:?}: deleting file", self);
+        debug!("{:?}: deleting file", self);
         fs::remove_file(&self.path).map_err(|e| {
             error!("{:?}: failed to delete segment {}", self, e);
             e
