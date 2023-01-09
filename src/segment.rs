@@ -1,4 +1,4 @@
-use log::{debug, error, info, log_enabled, trace};
+use log::{debug, error, log_enabled, trace};
 use std::cmp::Ordering;
 use std::fmt;
 use std::fs::{self, OpenOptions};
