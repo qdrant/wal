@@ -1,4 +1,4 @@
-use log::{debug, error, info, log_enabled, trace};
+use log::{debug, error, log_enabled, trace};
 use std::cmp::Ordering;
 use std::fmt;
 use std::fs::{self, OpenOptions};
@@ -186,7 +186,7 @@ impl Segment {
             crc: seed,
             flush_offset: 0,
         };
-        info!("{:?}: created", segment);
+        debug!("{:?}: created", segment);
         Ok(segment)
     }
 
@@ -250,8 +250,15 @@ impl Segment {
                 let mut digest = CASTAGNOLI.digest_with_initial(crc);
                 digest.update(&segment[offset..offset + HEADER_LEN + padded_len]);
                 let entry_crc = digest.finalize();
-                if entry_crc != LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..])
-                {
+                let stored_crc =
+                    LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]);
+                if entry_crc != stored_crc {
+                    log::warn!(
+                        "CRC mismatch at offset {}: {} != {}",
+                        offset,
+                        entry_crc,
+                        stored_crc
+                    );
                     break;
                 }
 
@@ -268,7 +275,7 @@ impl Segment {
             crc,
             flush_offset: 0,
         };
-        info!("{:?}: opened", segment);
+        debug!("{:?}: opened", segment);
         Ok(segment)
     }
 
@@ -350,6 +357,17 @@ impl Segment {
         Some(self.index.len() - 1)
     }
 
+    fn _read_seed_crc(&self) -> u32 {
+        LittleEndian::read_u32(&self.as_slice()[4..])
+    }
+
+    fn _read_entry_crc(&self, entry_id: usize) -> u32 {
+        let (offset, len) = self.index[entry_id];
+        let padding = padding(len);
+        let padded_len = len + padding;
+        LittleEndian::read_u32(&self.as_slice()[offset + padded_len..])
+    }
+
     /// Truncates the entries in the segment beginning with `from`.
     ///
     /// The entries are not guaranteed to be removed until the segment is
@@ -361,7 +379,16 @@ impl Segment {
         trace!("{:?}: truncating from position {}", self, from);
 
         // Remove the index entries.
-        let _ = self.index.drain(from..);
+        let deleted = self.index.drain(from..).count();
+        trace!("{:?}: truncated {} entries", self, deleted);
+
+        // Update the CRC.
+        if self.index.is_empty() {
+            self.crc = self._read_seed_crc(); // Seed
+        } else {
+            // Read CRC of the last entry.
+            self.crc = self._read_entry_crc(self.index.len() - 1);
+        }
 
         // And overwrite the existing data so that we will not read the data back after a crash.
         let size = self.size();
@@ -376,10 +403,13 @@ impl Segment {
         let end = self.size();
 
         match start.cmp(&end) {
-            Ordering::Equal => Ok(()), // nothing to flush
+            Ordering::Equal => {
+                trace!("{:?}: nothing to flush", self);
+                Ok(())
+            } // nothing to flush
             Ordering::Less => {
                 // flush new elements added since last flush
-                debug!("{:?}: flushing byte range [{}, {})", self, start, end);
+                trace!("{:?}: flushing byte range [{}, {})", self, start, end);
                 let mut view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
                 view.restrict(start, end - start)?;
@@ -388,7 +418,7 @@ impl Segment {
             Ordering::Greater => {
                 // most likely truncated in between flushes
                 // register new flush offset & flush the whole segment
-                debug!("{:?}: flushing after truncation", self);
+                trace!("{:?}: flushing after truncation", self);
                 let view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
                 view.flush()
@@ -409,7 +439,7 @@ impl Segment {
                 let mut view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
 
-                let log_msg = if log_enabled!(log::Level::Debug) {
+                let log_msg = if log_enabled!(log::Level::Trace) {
                     format!(
                         "{:?}: async flushing byte range [{}, {})",
                         &self, start, end
@@ -419,7 +449,7 @@ impl Segment {
                 };
 
                 thread::spawn(move || {
-                    debug!("{}", log_msg);
+                    trace!("{}", log_msg);
                     view.restrict(start, end - start).and_then(|_| view.flush())
                 })
             }
@@ -429,14 +459,14 @@ impl Segment {
                 let view = unsafe { self.mmap.clone() };
                 self.set_flush_offset(end);
 
-                let log_msg = if log_enabled!(log::Level::Debug) {
+                let log_msg = if log_enabled!(log::Level::Trace) {
                     format!("{:?}: async flushing after truncation", &self)
                 } else {
                     String::new()
                 };
 
                 thread::spawn(move || {
-                    debug!("{}", log_msg);
+                    trace!("{}", log_msg);
                     view.flush()
                 })
             }
@@ -453,7 +483,7 @@ impl Segment {
         // Sanity check the 8-byte alignment invariant.
         assert_eq!(required_capacity & !7, required_capacity);
         if required_capacity > self.capacity() {
-            info!("{:?}: resizing to {} bytes", self, required_capacity);
+            debug!("{:?}: resizing to {} bytes", self, required_capacity);
             self.flush()?;
             let file = OpenOptions::new()
                 .read(true)
@@ -517,7 +547,7 @@ impl Segment {
     where
         P: AsRef<Path>,
     {
-        info!("{:?}: renaming file to {:?}", self, path.as_ref());
+        debug!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path).map_err(|e| {
             error!("{:?}: failed to rename segment {}", self.path, e);
             e
@@ -528,7 +558,7 @@ impl Segment {
 
     /// Deletes the segment file.
     pub fn delete(self) -> Result<()> {
-        info!("{:?}: deleting file", self);
+        debug!("{:?}: deleting file", self);
         fs::remove_file(&self.path).map_err(|e| {
             error!("{:?}: failed to delete segment {}", self, e);
             e

@@ -939,6 +939,10 @@ mod test {
         assert_eq!(wal.closed_segments[3].segment.len(), 2);
         assert_eq!(wal.open_segment.segment.len(), 2); // 1 x 2 entries
 
+        wal.truncate(9).unwrap();
+
+        assert_eq!(wal.open_segment.segment.len(), 1); // 1 x 2 entries
+
         // truncate half of it
         wal.truncate(5).unwrap();
 
@@ -959,12 +963,30 @@ mod test {
         assert_eq!(wal.closed_segments[2].segment.len(), 1);
         assert_eq!(wal.open_segment.segment.len(), 0); // empty open segment
 
-        // add 10 more entries
+        // add 5 more entries
         for i in 0..5 {
             assert_eq!(i + 5, wal.append(&&entry[..]).unwrap());
         }
 
         // 5 closed segments
+        assert_eq!(wal.num_entries(), 10);
+        assert_eq!(wal.first_index(), 0);
+        assert_eq!(wal.last_index(), 9);
+        assert_eq!(wal.closed_segments.len(), 5);
+        assert_eq!(wal.closed_segments[0].segment.len(), 2); // 1,2
+        assert_eq!(wal.closed_segments[1].segment.len(), 2); // 3
+        assert_eq!(wal.closed_segments[2].segment.len(), 1); // 4 empty slot due to truncation
+        assert_eq!(wal.closed_segments[3].segment.len(), 2); // 5, 6
+        assert_eq!(wal.closed_segments[4].segment.len(), 2); // 7, 8
+        assert_eq!(wal.open_segment.segment.len(), 1); // 9
+
+        eprintln!("wal: {:?}", wal);
+        eprintln!("wal open: {:?}", wal.open_segment);
+        eprintln!("wal closed: {:?}", wal.closed_segments);
+
+        // test persistence
+        drop(wal);
+        let wal = Wal::open(dir.path()).unwrap();
         assert_eq!(wal.num_entries(), 10);
         assert_eq!(wal.first_index(), 0);
         assert_eq!(wal.last_index(), 9);
