@@ -581,19 +581,19 @@ fn create_loop(
         }
     }
 
-    let dir = File::open(&path)?;
+    let dir = File::open(&path).unwrap();
 
     while cont {
         id += 1;
         path.push(format!("open-{}", id));
         let segment = OpenSegment {
             id,
-            segment: Segment::create(&path, capacity)?,
+            segment: Segment::create(&path, capacity).unwrap(),
         };
         path.pop();
         // Sync the directory, guaranteeing that the segment file is durably
         // stored on the filesystem.
-        dir.sync_all()?;
+        dir.sync_all().unwrap();
         cont = tx.send(segment).is_ok();
     }
 
