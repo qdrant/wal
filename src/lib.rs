@@ -304,7 +304,7 @@ impl Wal {
                     if from == self.closed_segments[index].start_index {
                         for segment in self.closed_segments.drain(index..) {
                             // TODO: this should be async
-                            segment.segment.delete()?;
+                            segment.segment.delete().unwrap();
                         }
                     } else {
                         {
@@ -313,12 +313,12 @@ impl Wal {
                                 .segment
                                 .truncate((from - segment.start_index) as usize);
                             // flushing closed segment after truncation
-                            segment.segment.flush()?;
+                            segment.segment.flush().unwrap();
                         }
                         if index + 1 < self.closed_segments.len() {
                             for segment in self.closed_segments.drain(index + 1..) {
                                 // TODO: this should be async
-                                segment.segment.delete()?;
+                                segment.segment.delete().unwrap();
                             }
                         }
                     }
@@ -333,7 +333,7 @@ impl Wal {
                     );
                     for segment in self.closed_segments.drain(..) {
                         // TODO: this should be async
-                        segment.segment.delete()?;
+                        segment.segment.delete().unwrap();
                     }
                 }
             }
@@ -359,7 +359,7 @@ impl Wal {
             // At least one closed segment is required to store information
             if !self.closed_segments.is_empty() {
                 for segment in self.closed_segments.drain(..self.closed_segments.len() - 1) {
-                    segment.segment.delete()?
+                    segment.segment.delete().unwrap()
                 }
             }
         } else {
@@ -369,7 +369,7 @@ impl Wal {
             }
             trace!("PREFIX TRUNCATING UNTIL SEGMENT {}", index);
             for segment in self.closed_segments.drain(..index) {
-                segment.segment.delete()?
+                segment.segment.delete().unwrap()
             }
         }
         Ok(())
