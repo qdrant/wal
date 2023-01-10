@@ -99,6 +99,7 @@ impl Wal {
         debug!("Wal {{ path: {:?} }}: opening", path.as_ref());
 
         let dir = File::open(&path)?;
+        #[cfg(unix)]
         dir.try_lock_exclusive()?;
 
         // Holds open segments in the directory.
@@ -1000,6 +1001,7 @@ mod test {
     }
 
     /// Tests that two Wal instances can not coexist for the same directory.
+    #[cfg(unix)]
     #[test]
     fn test_exclusive_lock() {
         init_logger();
