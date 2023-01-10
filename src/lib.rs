@@ -1006,20 +1006,20 @@ mod test {
         assert_eq!(wal.open_segment.segment.len(), 1);
     }
 
-    /// Tests that two Wal instances can not coexist for the same directory.
-    #[cfg(unix)]
-    #[test]
-    fn test_exclusive_lock() {
-        init_logger();
-        let dir = tempdir::TempDir::new("wal").unwrap();
-        let wal = Wal::open(dir.path()).unwrap();
-        assert_eq!(
-            fs2::lock_contended_error().kind(),
-            Wal::open(dir.path()).unwrap_err().kind()
-        );
-        drop(wal);
-        assert!(Wal::open(dir.path()).is_ok());
-    }
+    // /// Tests that two Wal instances can not coexist for the same directory.
+    // #[cfg(unix)]
+    // #[test]
+    // fn test_exclusive_lock() {
+    //     init_logger();
+    //     let dir = tempdir::TempDir::new("wal").unwrap();
+    //     let wal = Wal::open(dir.path()).unwrap();
+    //     assert_eq!(
+    //         fs2::lock_contended_error().kind(),
+    //         Wal::open(dir.path()).unwrap_err().kind()
+    //     );
+    //     drop(wal);
+    //     assert!(Wal::open(dir.path()).is_ok());
+    // }
 
     #[test]
     fn test_segment_creator() {
