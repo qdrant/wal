@@ -561,8 +561,8 @@ impl Segment {
     /// Deletes the segment file.
     pub fn delete(self) -> Result<()> {
         debug!("{:?}: deleting file", self);
-        let path = self.path;
-        drop(self.mmap);
+        let path = self.path.clone();
+        drop(self);
         fs::remove_file(&path).map_err(|e| {
             error!("{:?}: failed to delete segment {}", path, e);
             e
