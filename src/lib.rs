@@ -74,7 +74,7 @@ pub struct Wal {
     /// The directory which contains the write ahead log. Used to hold an open
     /// file lock for the lifetime of the log.
     #[allow(dead_code)]
-    dir: File,
+    dir: Option<File>,
 
     /// The directory path.
     path: PathBuf,
@@ -98,9 +98,15 @@ impl Wal {
     {
         debug!("Wal {{ path: {:?} }}: opening", path.as_ref());
 
-        let dir = File::open(&path)?;
+        #[allow(unused_assignments)]
+        let mut dir_lock = None;
+
         #[cfg(unix)]
-        dir.try_lock_exclusive()?;
+        {
+            let dir = File::open(&path)?;
+            dir.try_lock_exclusive()?;
+            dir_lock = Some(dir);
+        }
 
         // Holds open segments in the directory.
         let mut open_segments: Vec<OpenSegment> = Vec::new();
@@ -191,7 +197,7 @@ impl Wal {
             open_segment,
             closed_segments,
             creator,
-            dir,
+            dir: dir_lock,
             path: path.as_ref().to_path_buf(),
             flush: None,
         };
