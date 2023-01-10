@@ -103,8 +103,8 @@ impl Wal {
 
         #[cfg(unix)]
         {
-            let dir = File::open(&path)?;
-            dir.try_lock_exclusive()?;
+            let dir = File::open(&path).unwrap();
+            dir.try_lock_exclusive().unwrap();
             dir_lock = Some(dir);
         }
 
@@ -112,8 +112,8 @@ impl Wal {
         let mut open_segments: Vec<OpenSegment> = Vec::new();
         let mut closed_segments: Vec<ClosedSegment> = Vec::new();
 
-        for entry in fs::read_dir(&path)? {
-            match open_dir_entry(entry?)? {
+        for entry in fs::read_dir(&path).unwrap() {
+            match open_dir_entry(entry.unwrap()).unwrap() {
                 Some(WalSegment::Open(open_segment)) => open_segments.push(open_segment),
                 Some(WalSegment::Closed(closed_segment)) => closed_segments.push(closed_segment),
                 None => {}
@@ -170,7 +170,7 @@ impl Wal {
                 let stranded_segment = open_segment.take();
                 open_segment = Some(segment);
                 if let Some(segment) = stranded_segment {
-                    let closed_segment = close_segment(segment, next_start_index)?;
+                    let closed_segment = close_segment(segment, next_start_index).unwrap();
                     next_start_index += closed_segment.segment.len() as u64;
                     closed_segments.push(closed_segment);
                 }
@@ -190,7 +190,7 @@ impl Wal {
 
         let open_segment = match open_segment {
             Some(segment) => segment,
-            None => creator.next()?,
+            None => creator.next().unwrap(),
         };
 
         let wal = Wal {
