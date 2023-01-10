@@ -121,8 +121,8 @@ impl Segment {
     /// The caller is responsible for flushing the containing directory in order
     /// to guarantee that the segment is durable in the event of a crash.
     pub fn create<P>(path: P, capacity: usize) -> Result<Segment>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         let file_name = path
             .as_ref()
@@ -194,8 +194,8 @@ impl Segment {
     ///
     /// An individual file must only be opened by one segment at a time.
     pub fn open<P>(path: P) -> Result<Segment>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         let file = OpenOptions::new()
             .read(true)
@@ -317,8 +317,8 @@ impl Segment {
     /// The entry may be immediately read from the log, but it is not guaranteed
     /// to be durably stored on disk until the segment is flushed.
     pub fn append<T>(&mut self, entry: &T) -> Option<usize>
-        where
-            T: Deref<Target=[u8]>,
+    where
+        T: Deref<Target = [u8]>,
     {
         if !self.sufficient_capacity(entry.len()) {
             return None;
@@ -546,8 +546,8 @@ impl Segment {
     /// The caller is responsible for syncing the directory in order to
     /// guarantee that the rename is durable in the event of a crash.
     pub fn rename<P>(&mut self, path: P) -> Result<()>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         debug!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path).map_err(|e| {
