@@ -581,6 +581,7 @@ fn create_loop(
         }
     }
 
+    #[cfg(unix)]
     let dir = File::open(&path).unwrap();
 
     while cont {
@@ -593,6 +594,7 @@ fn create_loop(
         path.pop();
         // Sync the directory, guaranteeing that the segment file is durably
         // stored on the filesystem.
+        #[cfg(unix)]
         dir.sync_all().unwrap();
         cont = tx.send(segment).is_ok();
     }
