@@ -174,6 +174,9 @@ impl Segment {
         let mut options = OpenOptions::new();
         options.read(true).write(true).create(true);
 
+        #[cfg(windows)]
+        options.share_mode(7); // FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
+
         let file = options.open(&path)?;
 
         let mmap =
@@ -197,11 +200,14 @@ impl Segment {
     where
         P: AsRef<Path>,
     {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(false)
-            .open(&path)?;
+
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create(true);
+
+        #[cfg(windows)]
+        options.share_mode(7); // FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
+
+        let file = options.open(&path)?;
         let capacity = file.metadata()?.len();
         if capacity > usize::MAX as u64 || capacity < HEADER_LEN as u64 {
             return Err(Error::new(
