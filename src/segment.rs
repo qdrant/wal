@@ -201,7 +201,7 @@ impl Segment {
         P: AsRef<Path>,
     {
         let mut options = OpenOptions::new();
-        options.read(true).write(true).create(true);
+        options.read(true).write(true).create(false);
 
         #[cfg(windows)]
         options.share_mode(7); // FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
