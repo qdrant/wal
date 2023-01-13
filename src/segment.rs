@@ -5,12 +5,11 @@ use std::fs::{self, OpenOptions};
 use std::io::{Error, ErrorKind, Result};
 use std::mem;
 use std::ops::Deref;
+#[cfg(windows)]
+use std::os::windows::prelude::*;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::thread;
-#[cfg(windows)]
-use std::os::windows::prelude::*;
-
 
 use byteorder::{ByteOrder, LittleEndian};
 use crc::{Crc, CRC_32_ISCSI};
@@ -124,8 +123,8 @@ impl Segment {
     /// The caller is responsible for flushing the containing directory in order
     /// to guarantee that the segment is durable in the event of a crash.
     pub fn create<P>(path: P, capacity: usize) -> Result<Segment>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         let file_name = path
             .as_ref()
@@ -173,10 +172,7 @@ impl Segment {
         // File renames are atomic, so we can safely rename the temporary file to the final file.
         fs::rename(&tmp_file_path, &path)?;
         let mut options = OpenOptions::new();
-        options
-            .read(true)
-            .write(true)
-            .create(true);
+        options.read(true).write(true).create(true);
 
         let file = options.open(&path)?;
 
@@ -198,8 +194,8 @@ impl Segment {
     ///
     /// An individual file must only be opened by one segment at a time.
     pub fn open<P>(path: P) -> Result<Segment>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         let file = OpenOptions::new()
             .read(true)
@@ -321,8 +317,8 @@ impl Segment {
     /// The entry may be immediately read from the log, but it is not guaranteed
     /// to be durably stored on disk until the segment is flushed.
     pub fn append<T>(&mut self, entry: &T) -> Option<usize>
-        where
-            T: Deref<Target=[u8]>,
+    where
+        T: Deref<Target = [u8]>,
     {
         if !self.sufficient_capacity(entry.len()) {
             return None;
@@ -550,8 +546,8 @@ impl Segment {
     /// The caller is responsible for syncing the directory in order to
     /// guarantee that the rename is durable in the event of a crash.
     pub fn rename<P>(&mut self, path: P) -> Result<()>
-        where
-            P: AsRef<Path>,
+    where
+        P: AsRef<Path>,
     {
         debug!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path).map_err(|e| {
