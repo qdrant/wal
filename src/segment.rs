@@ -200,7 +200,6 @@ impl Segment {
     where
         P: AsRef<Path>,
     {
-
         let mut options = OpenOptions::new();
         options.read(true).write(true).create(true);
 
