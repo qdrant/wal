@@ -163,6 +163,13 @@ impl Segment {
                 segment[3] = SEGMENT_VERSION;
                 LittleEndian::write_u32(&mut segment[4..], seed);
             }
+
+            // Manually sync each file in Windows since sync-ing cannot be done for the whole directory.
+            #[cfg(target_os = "windows")]
+            {
+                mmap.flush()?;
+                file.sync_all()?;
+            }
         };
 
         // File renames are atomic, so we can safely rename the temporary file to the final file.
@@ -555,8 +562,57 @@ impl Segment {
     /// Deletes the segment file.
     pub fn delete(self) -> Result<()> {
         debug!("{:?}: deleting file", self);
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            self.delete_unix()
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            self.delete_windows()
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn delete_unix(self) -> Result<()> {
         fs::remove_file(&self.path).map_err(|e| {
             error!("{:?}: failed to delete segment {}", self, e);
+            e
+        })
+    }
+
+    #[cfg(target_os = "windows")]
+    fn delete_windows(self) -> Result<()> {
+        let Segment {
+            mmap,
+            path,
+            index,
+            flush_offset,
+            ..
+        } = self;
+        let mmap_len = mmap.len();
+
+        // Unmaps the file before `fs::remove_file` else access will be denied
+        let _ = mmap.flush();
+        std::mem::drop(mmap);
+
+        fs::remove_file(&path).map_err(|e| {
+            error!(
+                "{:?}: failed to delete segment {}",
+                // `self` was destructured when mmap was yoinked out so `fmt::Debug` cannot be used
+                format_args!(
+                    "Segment {{ path: {:?}, flush_offset: {}, entries: {}, space: ({}/{}) }}",
+                    path,
+                    flush_offset,
+                    index.len(),
+                    index.last().map_or(HEADER_LEN, |&(offset, len)| {
+                        offset + len + padding(len) + CRC_LEN
+                    }),
+                    mmap_len
+                ),
+                e
+            );
             e
         })
     }
