@@ -98,7 +98,30 @@ impl Wal {
     {
         debug!("Wal {{ path: {:?} }}: opening", path.as_ref());
 
+        #[cfg(not(target_os = "windows"))]
+        let path = path.as_ref().to_path_buf();
+        #[cfg(not(target_os = "windows"))]
         let dir = File::open(&path)?;
+
+        // Windows workaround. Directories cannot be exclusively held so we create a proxy file
+        // inside the tmp directory which is used for locking. This is done because:
+        // - A Windows directory is not a file unlike in Linux, so we cannot open it with
+        //   `File::open` nor lock it with `try_lock_exclusive`
+        // - We want this to be auto-deleted together with the `TempDir`
+        #[cfg(target_os = "windows")]
+        let mut path = path.as_ref().to_path_buf();
+        #[cfg(target_os = "windows")]
+        let dir = {
+            path.push(".wal");
+            let dir = File::options()
+                .create(true)
+                .read(true)
+                .write(true)
+                .open(&path)?;
+            path.pop();
+            dir
+        };
+
         dir.try_lock_exclusive()?;
 
         // Holds open segments in the directory.
@@ -191,7 +214,7 @@ impl Wal {
             closed_segments,
             creator,
             dir,
-            path: path.as_ref().to_path_buf(),
+            path,
             flush: None,
         };
         info!("{:?}: opened", wal);
@@ -574,6 +597,8 @@ fn create_loop(
         }
     }
 
+    // Directory being a file only applies to Linux
+    #[cfg(not(target_os = "windows"))]
     let dir = File::open(&path)?;
 
     while cont {
@@ -586,6 +611,7 @@ fn create_loop(
         path.pop();
         // Sync the directory, guaranteeing that the segment file is durably
         // stored on the filesystem.
+        #[cfg(not(target_os = "windows"))]
         dir.sync_all()?;
         cont = tx.send(segment).is_ok();
     }
