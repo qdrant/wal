@@ -1,4 +1,4 @@
-use memmap::{MmapMut, MmapOptions};
+use memmap2::{MmapMut, MmapOptions};
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::fs::File;
