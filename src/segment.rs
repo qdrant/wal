@@ -9,10 +9,10 @@ use std::path::{Path, PathBuf};
 use std::ptr;
 use std::thread;
 
+use crate::mmap_view_sync::MmapViewSync;
 use byteorder::{ByteOrder, LittleEndian};
 use crc::{Crc, CRC_32_ISCSI};
 use fs2::FileExt;
-use memmap::{Mmap, MmapViewSync, Protection};
 
 /// The magic bytes and version tag of the segment header.
 const SEGMENT_MAGIC: &[u8; 3] = b"wal";
@@ -156,9 +156,7 @@ impl Segment {
 
             file.allocate(capacity as u64)?;
 
-            let mut mmap =
-                Mmap::open_with_offset(&file, Protection::ReadWrite, 0, capacity)?.into_view_sync();
-
+            let mut mmap = MmapViewSync::from_file(&file, 0, capacity)?;
             {
                 let segment = unsafe { &mut mmap.as_mut_slice() };
                 copy_memory(SEGMENT_MAGIC, segment);
@@ -176,8 +174,7 @@ impl Segment {
             .create(true)
             .open(&path)?;
 
-        let mmap =
-            Mmap::open_with_offset(&file, Protection::ReadWrite, 0, capacity)?.into_view_sync();
+        let mmap = MmapViewSync::from_file(&file, 0, capacity)?;
 
         let segment = Segment {
             mmap,
@@ -213,8 +210,7 @@ impl Segment {
         // Round capacity down to the nearest 8-byte alignment, since the
         // segment would not be able to take advantage of the space.
         let capacity = capacity as usize & !7;
-        let mmap =
-            Mmap::open_with_offset(&file, Protection::ReadWrite, 0, capacity)?.into_view_sync();
+        let mmap = MmapViewSync::from_file(&file, 0, capacity)?;
 
         let mut index = Vec::new();
         let mut crc;
@@ -494,9 +490,7 @@ impl Segment {
                 .open(&self.path)?;
             file.allocate(required_capacity as u64)?;
 
-            let mut mmap =
-                Mmap::open_with_offset(&file, Protection::ReadWrite, 0, required_capacity)?
-                    .into_view_sync();
+            let mut mmap = MmapViewSync::from_file(&file, 0, required_capacity)?;
             mem::swap(&mut mmap, &mut self.mmap);
         }
         Ok(())

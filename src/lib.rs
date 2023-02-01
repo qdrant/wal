@@ -14,6 +14,7 @@ use std::thread;
 
 pub use segment::{Entry, Segment};
 
+mod mmap_view_sync;
 mod segment;
 pub mod test_utils;
 
