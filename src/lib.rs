@@ -138,8 +138,7 @@ impl Wal {
                     return Err(Error::new(
                         ErrorKind::InvalidData,
                         format!(
-                            "missing segment(s) containing wal entries {} to {}",
-                            next_start_index, start_index
+                            "missing segment(s) containing wal entries {next_start_index} to {start_index}"
                         ),
                     ));
                 }
@@ -208,7 +207,7 @@ impl Wal {
             flush.join().map_err(|err| {
                 Error::new(
                     ErrorKind::Other,
-                    format!("wal flush thread panicked: {:?}", err),
+                    format!("wal flush thread panicked: {err:?}"),
                 )
             })??;
         };
@@ -450,7 +449,7 @@ fn close_segment(mut segment: OpenSegment, start_index: u64) -> Result<ClosedSeg
     let new_path = segment
         .segment
         .path()
-        .with_file_name(format!("closed-{}", start_index));
+        .with_file_name(format!("closed-{start_index}"));
     segment.segment.rename(new_path)?;
     Ok(ClosedSegment {
         start_index,
@@ -579,7 +578,7 @@ fn create_loop(
 
     while cont {
         id += 1;
-        path.push(format!("open-{}", id));
+        path.push(format!("open-{id}"));
         let segment = OpenSegment {
             id,
             segment: Segment::create(&path, capacity)?,
@@ -981,7 +980,7 @@ mod test {
         assert_eq!(wal.closed_segments[4].segment.len(), 2); // 7, 8
         assert_eq!(wal.open_segment.segment.len(), 1); // 9
 
-        eprintln!("wal: {:?}", wal);
+        eprintln!("wal: {wal:?}");
         eprintln!("wal open: {:?}", wal.open_segment);
         eprintln!("wal closed: {:?}", wal.closed_segments);
 

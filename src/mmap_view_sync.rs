@@ -230,7 +230,7 @@ mod test {
             .read(true)
             .write(true)
             .create(true)
-            .open(&path)
+            .open(path)
             .unwrap();
         file.set_len(len).unwrap();
 

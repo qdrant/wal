@@ -38,10 +38,10 @@ fn test() {
     let seed: usize = rand::thread_rng().next_u32() as usize;
     let path = tempdir.path().join("segment");
 
-    println!("Spawning subprocess; path: {:?}; seed: {}", path, seed);
+    println!("Spawning subprocess; path: {path:?}; seed: {seed}");
 
     let exit_code = process::Command::new(env::current_exe().unwrap())
-        .env("SEED", format!("{}", seed))
+        .env("SEED", format!("{seed}"))
         .env("SEGMENT_PATH", format!("{}", path.display()))
         .status()
         .unwrap()

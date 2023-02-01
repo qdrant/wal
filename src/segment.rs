@@ -131,8 +131,8 @@ impl Segment {
             .expect("Path to WAL segment file provided");
 
         let tmp_file_path = match path.as_ref().parent() {
-            Some(parent) => parent.join(format!("tmp-{}", file_name)),
-            None => PathBuf::from(format!("tmp-{}", file_name)),
+            Some(parent) => parent.join(format!("tmp-{file_name}")),
+            None => PathBuf::from(format!("tmp-{file_name}")),
         };
 
         // Round capacity down to the nearest 8-byte alignment, since the
@@ -141,7 +141,7 @@ impl Segment {
         if capacity < HEADER_LEN {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("invalid segment capacity: {}", capacity),
+                format!("invalid segment capacity: {capacity}"),
             ));
         }
         let seed = rand::random();
@@ -203,7 +203,7 @@ impl Segment {
         if capacity > usize::MAX as u64 || capacity < HEADER_LEN as u64 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("invalid segment capacity: {}", capacity),
+                format!("invalid segment capacity: {capacity}"),
             ));
         }
 
@@ -741,7 +741,7 @@ mod test {
                 }
                 segment.flush().unwrap();
             } else {
-                eprintln!("segment_res = {:#?}", segment_res);
+                eprintln!("segment_res = {segment_res:#?}");
                 panic!("Failed to create segment");
             }
         }
