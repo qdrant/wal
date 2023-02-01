@@ -24,12 +24,13 @@ impl MmapViewSync {
             MmapOptions::new()
                 .offset(offset as u64)
                 .len(capacity)
-                .map_mut(&file)?
+                .map_mut(file)?
         };
 
         Ok(mmap.into())
     }
 
+    #[allow(dead_code)]
     pub fn anonymous(capacity: usize) -> Result<MmapViewSync> {
         let mmap = MmapOptions::new().len(capacity).map_anon()?;
 
@@ -39,6 +40,7 @@ impl MmapViewSync {
     /// Split the view into disjoint pieces at the specified offset.
     ///
     /// The provided offset must be less than the view's length.
+    #[allow(dead_code)]
     pub fn split_at(self, offset: usize) -> Result<(MmapViewSync, MmapViewSync)> {
         if self.len < offset {
             return Err(Error::new(
@@ -76,7 +78,7 @@ impl MmapViewSync {
                                        of the current view",
             ));
         }
-        self.offset = self.offset + offset;
+        self.offset += offset;
         self.len = len;
         Ok(())
     }
@@ -91,6 +93,7 @@ impl MmapViewSync {
     /// Get a mutable reference to the inner mmap.
     ///
     /// The caller must ensure that memory outside the `offset`/`len` range is not accessed.
+    #[allow(clippy::mut_from_ref)]
     fn inner_mut(&self) -> &mut MmapMut {
         unsafe { &mut *self.inner.get() }
     }
@@ -239,12 +242,12 @@ mod test {
         let (mut view1, mut view2) = view.split_at(split).unwrap();
 
         let join1 = thread::spawn(move || {
-            unsafe { view1.as_mut_slice() }.write(&incr1).unwrap();
+            let _written = unsafe { view1.as_mut_slice() }.write(&incr1).unwrap();
             view1.flush().unwrap();
         });
 
         let join2 = thread::spawn(move || {
-            unsafe { view2.as_mut_slice() }.write(&incr2).unwrap();
+            let _written = unsafe { view2.as_mut_slice() }.write(&incr2).unwrap();
             view2.flush().unwrap();
         });
 
