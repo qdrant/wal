@@ -605,6 +605,7 @@ pub fn segment_overhead() -> usize {
 #[cfg(test)]
 mod test {
     use std::io::ErrorKind;
+    use tempfile::Builder;
 
     use super::{padding, Segment};
 
@@ -632,7 +633,7 @@ mod test {
     }
 
     fn create_segment(len: usize) -> Segment {
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("sync-segment");
         Segment::create(path, len).unwrap()
@@ -678,7 +679,7 @@ mod test {
     #[test]
     fn test_create_dir_path() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         assert!(Segment::open(dir.path()).is_err());
     }
 
@@ -712,7 +713,7 @@ mod test {
     #[test]
     fn test_open() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-open");
 
@@ -760,7 +761,7 @@ mod test {
     #[test]
     fn test_overwrite() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-overwrite");
 
@@ -784,7 +785,7 @@ mod test {
     #[test]
     fn test_open_nonexistent() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-open-nonexistent");
         assert_eq!(

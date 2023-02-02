@@ -599,6 +599,7 @@ mod test {
     use log::trace;
     use quickcheck::TestResult;
     use std::io::Write;
+    use tempfile::Builder;
 
     use crate::segment::Segment;
     use crate::test_utils::EntryGenerator;
@@ -614,7 +615,7 @@ mod test {
     fn check_wal() {
         init_logger();
         fn wal(entry_count: u8) -> TestResult {
-            let dir = tempdir::TempDir::new("wal").unwrap();
+            let dir = Builder::new().prefix("wal").tempdir().unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
                 &WalOptions {
@@ -649,7 +650,7 @@ mod test {
     fn check_last_index() {
         init_logger();
         fn check(entry_count: u8) -> TestResult {
-            let dir = tempdir::TempDir::new("wal").unwrap();
+            let dir = Builder::new().prefix("wal").tempdir().unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
                 &WalOptions {
@@ -683,7 +684,7 @@ mod test {
     fn check_clear() {
         init_logger();
         fn check(entry_count: u8) -> TestResult {
-            let dir = tempdir::TempDir::new("wal").unwrap();
+            let dir = Builder::new().prefix("wal").tempdir().unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
                 &WalOptions {
@@ -716,7 +717,7 @@ mod test {
                 .into_iter()
                 .take(entry_count as usize)
                 .collect::<Vec<_>>();
-            let dir = tempdir::TempDir::new("wal").unwrap();
+            let dir = Builder::new().prefix("wal").tempdir().unwrap();
             {
                 let mut wal = Wal::with_options(
                     dir.path(),
@@ -772,7 +773,7 @@ mod test {
             if truncate > entry_count {
                 return TestResult::discard();
             }
-            let dir = tempdir::TempDir::new("wal").unwrap();
+            let dir = Builder::new().prefix("wal").tempdir().unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
                 &WalOptions {
@@ -820,7 +821,7 @@ mod test {
             if until > entry_count {
                 return TestResult::discard();
             }
-            let dir = tempdir::TempDir::new("wal").unwrap();
+            let dir = Builder::new().prefix("wal").tempdir().unwrap();
             let mut wal = Wal::with_options(
                 dir.path(),
                 &WalOptions {
@@ -849,7 +850,7 @@ mod test {
     #[test]
     fn test_append() {
         init_logger();
-        let dir = tempdir::TempDir::new("wal").unwrap();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
         let mut wal = Wal::open(dir.path()).unwrap();
 
         let entry: &[u8] = &[42u8; 4096];
@@ -861,7 +862,7 @@ mod test {
     #[test]
     fn test_truncate() {
         init_logger();
-        let dir = tempdir::TempDir::new("wal").unwrap();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
         // 2 entries should fit in each segment
         let mut wal = Wal::with_options(
             dir.path(),
@@ -894,7 +895,7 @@ mod test {
     #[test]
     fn test_truncate_flush() {
         init_logger();
-        let dir = tempdir::TempDir::new("wal").unwrap();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
         // 2 entries should fit in each segment
         let mut wal = Wal::with_options(
             dir.path(),
@@ -1003,7 +1004,7 @@ mod test {
     #[test]
     fn test_exclusive_lock() {
         init_logger();
-        let dir = tempdir::TempDir::new("wal").unwrap();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
         let wal = Wal::open(dir.path()).unwrap();
         assert_eq!(
             fs2::lock_contended_error().kind(),
@@ -1016,7 +1017,7 @@ mod test {
     #[test]
     fn test_segment_creator() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
 
         let segments = vec![OpenSegment {
             id: 3,
@@ -1033,7 +1034,7 @@ mod test {
     fn test_record_id_preserving() {
         init_logger();
         let entry_count = 55;
-        let dir = tempdir::TempDir::new("wal").unwrap();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
         let options = WalOptions {
             segment_capacity: 512,
             segment_queue_len: 3,
@@ -1070,7 +1071,7 @@ mod test {
     fn test_offset_after_open() {
         init_logger();
         let entry_count = 55;
-        let dir = tempdir::TempDir::new("wal").unwrap();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
         let options = WalOptions {
             segment_capacity: 512,
             segment_queue_len: 3,

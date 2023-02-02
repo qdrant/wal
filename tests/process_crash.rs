@@ -16,6 +16,7 @@ use std::env;
 use std::process;
 
 use rand::RngCore;
+use tempfile::Builder;
 use wal::test_utils::EntryGenerator;
 
 const SEGMENT_CAPACITY: usize = 32 * 1024 * 1024;
@@ -34,7 +35,7 @@ fn process_crash() {
 }
 
 fn test() {
-    let tempdir = tempdir::TempDir::new("process-crash").unwrap();
+    let tempdir = Builder::new().prefix("segment").tempdir().unwrap();
     let seed: usize = rand::thread_rng().next_u32() as usize;
     let path = tempdir.path().join("segment");
 

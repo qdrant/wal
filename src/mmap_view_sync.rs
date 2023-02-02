@@ -169,12 +169,11 @@ unsafe impl Send for MmapViewSync {}
 
 #[cfg(test)]
 mod test {
-    extern crate tempdir;
-
     use std::fs;
     use std::io::{Read, Write};
     use std::sync::Arc;
     use std::thread;
+    use tempfile::Builder;
 
     use super::*;
 
@@ -223,7 +222,7 @@ mod test {
         let len = 131072; // 256KiB
         let split = 66560; // 65KiB + 10B
 
-        let tempdir = tempdir::TempDir::new("mmap").unwrap();
+        let tempdir = Builder::new().prefix("mmap").tempdir().unwrap();
         let path = tempdir.path().join("mmap");
 
         let mut file = fs::OpenOptions::new()
