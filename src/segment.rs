@@ -590,6 +590,8 @@ impl Segment {
 
     #[cfg(target_os = "windows")]
     fn delete_windows(self) -> Result<()> {
+        const DELETE_TRIES: u32 = 3;
+
         let Segment {
             mmap,
             path,
@@ -603,24 +605,35 @@ impl Segment {
         let _ = mmap.flush();
         std::mem::drop(mmap);
 
-        fs::remove_file(&path).map_err(|e| {
-            error!(
-                "{:?}: failed to delete segment {}",
-                // `self` was destructured when mmap was yoinked out so `fmt::Debug` cannot be used
-                format_args!(
-                    "Segment {{ path: {:?}, flush_offset: {}, entries: {}, space: ({}/{}) }}",
-                    path,
-                    flush_offset,
-                    index.len(),
-                    index.last().map_or(HEADER_LEN, |&(offset, len)| {
-                        offset + len + padding(len) + CRC_LEN
-                    }),
-                    mmap_len
-                ),
-                e
-            );
-            e
-        })
+        let mut tries = 0;
+        loop {
+            tries += 1;
+            match fs::remove_file(&path) {
+                Ok(_) => return Ok(()),
+                Err(e) => {
+                    if tries >= DELETE_TRIES {
+                        error!(
+                            "{:?}: failed to delete segment {}",
+                            // `self` was destructured when mmap was yoinked out so `fmt::Debug`
+                            // cannot be used
+                            format_args!(
+                                "Segment {{ path: {:?}, flush_offset: {}, entries: {}, \
+                                space: ({}/{}) }}",
+                                path,
+                                flush_offset,
+                                index.len(),
+                                index.last().map_or(HEADER_LEN, |&(offset, len)| {
+                                    offset + len + padding(len) + CRC_LEN
+                                }),
+                                mmap_len
+                            ),
+                            e
+                        );
+                        return Err(e);
+                    }
+                }
+            }
+        }
     }
 }
 
