@@ -660,6 +660,7 @@ pub fn segment_overhead() -> usize {
 
 #[cfg(test)]
 mod test {
+    use log::LevelFilter;
     use std::io::ErrorKind;
     use tempfile::Builder;
 
@@ -696,7 +697,10 @@ mod test {
     }
 
     fn init_logger() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Debug)
+            .is_test(true)
+            .try_init();
     }
 
     /// Checks that entries can be appended to a segment.
