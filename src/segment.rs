@@ -701,7 +701,6 @@ mod test {
 
     /// Checks that entries can be appended to a segment.
     fn check_append(segment: &mut Segment) {
-        init_logger();
         assert_eq!(0, segment.len());
 
         let entries: Vec<Vec<u8>> = EntryGenerator::with_segment_capacity(segment.capacity())

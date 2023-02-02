@@ -23,6 +23,6 @@ jobs:
       - name: Build
         run: cargo build --verbose
       - name: Run tests
-        run: cargo test --verbose
+        run: RUST_LOG="debug" cargo test -- --nocapture
       - name: Check cargo clippy warnings
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
