@@ -622,7 +622,7 @@ fn create_loop(
 
 #[cfg(test)]
 mod test {
-    use log::{trace, LevelFilter};
+    use log::trace;
     use quickcheck::TestResult;
     use std::io::Write;
     use tempfile::Builder;
@@ -633,10 +633,7 @@ mod test {
     use super::{OpenSegment, SegmentCreator, Wal, WalOptions};
 
     fn init_logger() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Debug)
-            .is_test(true)
-            .try_init();
+        let _ = env_logger::builder().is_test(true).try_init();
     }
 
     /// Check that entries appended to the write ahead log can be read back.

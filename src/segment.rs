@@ -8,6 +8,8 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::thread;
+#[cfg(target_os = "windows")]
+use std::time::Duration;
 
 use crate::mmap_view_sync::MmapViewSync;
 use byteorder::{ByteOrder, LittleEndian};
@@ -596,7 +598,7 @@ impl Segment {
         let mmap_len = mmap.len();
 
         // Unmaps the file before `fs::remove_file` else access will be denied
-        let _ = mmap.flush();
+        mmap.flush()?;
         std::mem::drop(mmap);
 
         let mut tries = 0;
@@ -624,6 +626,8 @@ impl Segment {
                             e
                         );
                         return Err(e);
+                    } else {
+                        thread::sleep(Duration::from_millis(1));
                     }
                 }
             }
@@ -673,7 +677,6 @@ pub fn segment_overhead() -> usize {
 
 #[cfg(test)]
 mod test {
-    use log::LevelFilter;
     use std::io::ErrorKind;
     use tempfile::Builder;
 
@@ -710,10 +713,7 @@ mod test {
     }
 
     fn init_logger() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Debug)
-            .is_test(true)
-            .try_init();
+        let _ = env_logger::builder().is_test(true).try_init();
     }
 
     /// Checks that entries can be appended to a segment.
