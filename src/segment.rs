@@ -8,6 +8,8 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::thread;
+#[cfg(target_os = "windows")]
+use std::time::Duration;
 
 use crate::mmap_view_sync::MmapViewSync;
 use byteorder::{ByteOrder, LittleEndian};
@@ -162,6 +164,13 @@ impl Segment {
                 copy_memory(SEGMENT_MAGIC, segment);
                 segment[3] = SEGMENT_VERSION;
                 LittleEndian::write_u32(&mut segment[4..], seed);
+            }
+
+            // Manually sync each file in Windows since sync-ing cannot be done for the whole directory.
+            #[cfg(target_os = "windows")]
+            {
+                mmap.flush()?;
+                file.sync_all()?;
             }
         };
 
@@ -555,10 +564,74 @@ impl Segment {
     /// Deletes the segment file.
     pub fn delete(self) -> Result<()> {
         debug!("{:?}: deleting file", self);
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            self.delete_unix()
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            self.delete_windows()
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn delete_unix(self) -> Result<()> {
         fs::remove_file(&self.path).map_err(|e| {
             error!("{:?}: failed to delete segment {}", self, e);
             e
         })
+    }
+
+    #[cfg(target_os = "windows")]
+    fn delete_windows(self) -> Result<()> {
+        const DELETE_TRIES: u32 = 3;
+
+        let Segment {
+            mmap,
+            path,
+            index,
+            flush_offset,
+            ..
+        } = self;
+        let mmap_len = mmap.len();
+
+        // Unmaps the file before `fs::remove_file` else access will be denied
+        mmap.flush()?;
+        std::mem::drop(mmap);
+
+        let mut tries = 0;
+        loop {
+            tries += 1;
+            match fs::remove_file(&path) {
+                Ok(_) => return Ok(()),
+                Err(e) => {
+                    if tries >= DELETE_TRIES {
+                        error!(
+                            "{:?}: failed to delete segment {}",
+                            // `self` was destructured when mmap was yoinked out so `fmt::Debug`
+                            // cannot be used
+                            format_args!(
+                                "Segment {{ path: {:?}, flush_offset: {}, entries: {}, \
+                                space: ({}/{}) }}",
+                                path,
+                                flush_offset,
+                                index.len(),
+                                index.last().map_or(HEADER_LEN, |&(offset, len)| {
+                                    offset + len + padding(len) + CRC_LEN
+                                }),
+                                mmap_len
+                            ),
+                            e
+                        );
+                        return Err(e);
+                    } else {
+                        thread::sleep(Duration::from_millis(1));
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -605,6 +678,7 @@ pub fn segment_overhead() -> usize {
 #[cfg(test)]
 mod test {
     use std::io::ErrorKind;
+    use tempfile::Builder;
 
     use super::{padding, Segment};
 
@@ -632,7 +706,7 @@ mod test {
     }
 
     fn create_segment(len: usize) -> Segment {
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("sync-segment");
         Segment::create(path, len).unwrap()
@@ -644,7 +718,6 @@ mod test {
 
     /// Checks that entries can be appended to a segment.
     fn check_append(segment: &mut Segment) {
-        init_logger();
         assert_eq!(0, segment.len());
 
         let entries: Vec<Vec<u8>> = EntryGenerator::with_segment_capacity(segment.capacity())
@@ -678,7 +751,7 @@ mod test {
     #[test]
     fn test_create_dir_path() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         assert!(Segment::open(dir.path()).is_err());
     }
 
@@ -712,7 +785,7 @@ mod test {
     #[test]
     fn test_open() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-open");
 
@@ -760,7 +833,7 @@ mod test {
     #[test]
     fn test_overwrite() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-overwrite");
 
@@ -784,7 +857,7 @@ mod test {
     #[test]
     fn test_open_nonexistent() {
         init_logger();
-        let dir = tempdir::TempDir::new("segment").unwrap();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("test-open-nonexistent");
         assert_eq!(
