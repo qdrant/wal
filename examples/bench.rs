@@ -53,7 +53,7 @@ fn format_duration(n: u64) -> String {
     } else if n > 1_000 {
         format!("{:.2}μs", n as f64 / 1_000f64)
     } else {
-        format!("{}ns", n)
+        format!("{n}ns")
     }
 }
 
@@ -65,7 +65,7 @@ fn format_bytes(n: usize) -> String {
     } else if n > 1_024 {
         format!("{:.2}KiB", n as f64 / 1_024f64)
     } else {
-        format!("{}B", n)
+        format!("{n}B")
     }
 }
 
@@ -73,7 +73,7 @@ fn parse_bytes(s: &str) -> usize {
     let regex = Regex::new(r"(?i)^(\d+(?:\.\d+)?)\s?(k|m|g)?i?b?$").unwrap();
     let caps = regex
         .captures(s)
-        .unwrap_or_else(|| panic!("unable to parse byte amount: {}", s));
+        .unwrap_or_else(|| panic!("unable to parse byte amount: {s}"));
     let n: usize = FromStr::from_str(caps.get(1).unwrap().as_str()).unwrap();
 
     match caps.get(2).map(|m| m.as_str()) {
@@ -81,7 +81,7 @@ fn parse_bytes(s: &str) -> usize {
         Some("k") | Some("K") => n * 1_024,
         Some("m") | Some("M") => n * 1_048_576,
         Some("g") | Some("G") => n * 1_073_741_824,
-        _ => panic!("unable to parse byte amount: {}", s),
+        _ => panic!("unable to parse byte amount: {s}"),
     }
 }
 

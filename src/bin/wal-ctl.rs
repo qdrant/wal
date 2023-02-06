@@ -56,10 +56,7 @@ fn main() {
         });
 
     if !path.is_dir() {
-        eprintln!(
-            "Unable to open write ahead log: path {:?} is not a directory.",
-            path
-        );
+        eprintln!("Unable to open write ahead log: path {path:?} is not a directory.");
         process::exit(1);
     }
 
@@ -79,10 +76,7 @@ fn main() {
 
 fn open_wal(path: &Path) -> Wal {
     Wal::open(path).unwrap_or_else(|error| {
-        eprintln!(
-            "Unable to open write ahead log in directory {:?}: {}.",
-            path, error
-        );
+        eprintln!("Unable to open write ahead log in directory {path:?}: {error}.");
         process::exit(1);
     })
 }

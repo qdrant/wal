@@ -105,7 +105,7 @@ mod test {
         let mean = sum as f64 / sizes.len() as f64;
         let median = sizes[sizes.len() / 2];
 
-        println!("median: {}, mean: {}", median, mean);
+        println!("median: {median}, mean: {mean}");
 
         assert!(median >= 18);
         assert!(median <= 30);
