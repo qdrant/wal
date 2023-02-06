@@ -21,7 +21,7 @@ serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 docopt = "1.1"
-histogram = "0.6"
+histogram = "0.7"
 quickcheck = "1.0.3"
 regex = "1.5"
 tempfile = "3.3.0"
