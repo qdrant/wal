@@ -14,7 +14,8 @@ use std::time::Duration;
 use crate::mmap_view_sync::MmapViewSync;
 use byteorder::{ByteOrder, LittleEndian};
 use crc::{Crc, CRC_32_ISCSI};
-use fs2::FileExt;
+#[cfg(not(unix))]
+use fs4::FileExt;
 
 /// The magic bytes and version tag of the segment header.
 const SEGMENT_MAGIC: &[u8; 3] = b"wal";
@@ -156,7 +157,14 @@ impl Segment {
                 .create(true)
                 .open(&tmp_file_path)?;
 
+            // fs4 provides some cross-platform bindings which help for Windows.
+            #[cfg(not(unix))]
             file.allocate(capacity as u64)?;
+            // For all unix systems WAL can just use ftruncate directly
+            #[cfg(unix)]
+            {
+                rustix::fs::ftruncate(&file, capacity as u64)?;
+            }
 
             let mut mmap = MmapViewSync::from_file(&file, 0, capacity)?;
             {
@@ -497,7 +505,14 @@ impl Segment {
                 .write(true)
                 .create(false)
                 .open(&self.path)?;
+            // fs4 provides some cross-platform bindings which help for Windows.
+            #[cfg(not(unix))]
             file.allocate(required_capacity as u64)?;
+            // For all unix systems WAL can just use ftruncate directly
+            #[cfg(unix)]
+            {
+                rustix::fs::ftruncate(&file, required_capacity as u64)?;
+            }
 
             let mut mmap = MmapViewSync::from_file(&file, 0, required_capacity)?;
             mem::swap(&mut mmap, &mut self.mmap);
