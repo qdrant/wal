@@ -720,9 +720,8 @@ mod test {
     fn check_append(segment: &mut Segment) {
         assert_eq!(0, segment.len());
 
-        let entries: Vec<Vec<u8>> = EntryGenerator::with_segment_capacity(segment.capacity())
-            .into_iter()
-            .collect();
+        let entries: Vec<Vec<u8>> =
+            EntryGenerator::with_segment_capacity(segment.capacity()).collect();
 
         for (idx, entry) in entries.iter().enumerate() {
             assert_eq!(idx, segment.append(entry).unwrap());

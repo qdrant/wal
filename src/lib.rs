@@ -651,7 +651,6 @@ mod test {
             )
             .unwrap();
             let entries = EntryGenerator::new()
-                .into_iter()
                 .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
@@ -686,7 +685,6 @@ mod test {
             )
             .unwrap();
             let entries = EntryGenerator::new()
-                .into_iter()
                 .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
@@ -720,7 +718,6 @@ mod test {
             )
             .unwrap();
             let entries = EntryGenerator::new()
-                .into_iter()
                 .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
@@ -740,7 +737,6 @@ mod test {
         init_logger();
         fn wal(entry_count: u8) -> TestResult {
             let entries = EntryGenerator::new()
-                .into_iter()
                 .take(entry_count as usize)
                 .collect::<Vec<_>>();
             let dir = Builder::new().prefix("wal").tempdir().unwrap();
@@ -809,7 +805,6 @@ mod test {
             )
             .unwrap();
             let entries = EntryGenerator::new()
-                .into_iter()
                 .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
@@ -857,7 +852,6 @@ mod test {
             )
             .unwrap();
             let entries = EntryGenerator::new()
-                .into_iter()
                 .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
@@ -1067,10 +1061,7 @@ mod test {
         };
 
         let mut wal = Wal::with_options(dir.path(), &options).unwrap();
-        let entries = EntryGenerator::new()
-            .into_iter()
-            .take(entry_count)
-            .collect::<Vec<_>>();
+        let entries = EntryGenerator::new().take(entry_count).collect::<Vec<_>>();
 
         for entry in &entries {
             wal.append(entry).unwrap();
@@ -1105,10 +1096,7 @@ mod test {
         let start_index;
         {
             let mut wal = Wal::with_options(dir.path(), &options).unwrap();
-            let entries = EntryGenerator::new()
-                .into_iter()
-                .take(entry_count)
-                .collect::<Vec<_>>();
+            let entries = EntryGenerator::new().take(entry_count).collect::<Vec<_>>();
 
             for entry in &entries {
                 wal.append(entry).unwrap();
