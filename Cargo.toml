@@ -9,10 +9,10 @@ byteorder = "1.4"
 crc = "3"
 fs2 = "0.4"
 log = "0.4"
-memmap2 = "0.5.8"
+memmap2 = "0.5.10"
 rand = "0.8.5"
 rand_distr = "0.4.3"
-crossbeam-channel = "0.5.6"
+crossbeam-channel = "0.5.7"
 
 # Binary dependencies
 docopt = "1.1"
@@ -20,9 +20,8 @@ env_logger = "0.10"
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
-docopt = "1.1"
 hdrhistogram = "7.5.2"
 quickcheck = "1.0.3"
-regex = "1.5"
-tempfile = "3.3.0"
-chrono = "0.4.23"
+regex = "1.7"
+tempfile = "3.4.0"
+chrono = "0.4.24"
