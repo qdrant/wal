@@ -2,7 +2,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use docopt::Docopt;
-use histogram::Histogram;
+use hdrhistogram::Histogram;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use regex::Regex;
@@ -104,8 +104,8 @@ fn append(args: &Args) {
     let mut small_rng = StdRng::from_entropy();
     small_rng.fill_bytes(&mut buf);
 
-    let mut append_hist = Histogram::new();
-    let mut sync_hist = Histogram::new();
+    let mut append_hist = Histogram::<u64>::new_with_bounds(1, 60 * 60 * 1000, 2).unwrap();
+    let mut sync_hist = Histogram::<u64>::new_with_bounds(1, 60 * 60 * 1000, 2).unwrap();
 
     let mut entries = 0usize;
     let mut time: u64 = precise_time_ns();
@@ -115,10 +115,10 @@ fn append(args: &Args) {
         if args.flag_batch != 0 && entries % args.flag_batch == 0 {
             let start_sync = precise_time_ns();
             //future.await().unwrap();
-            sync_hist.increment(precise_time_ns() - start_sync).unwrap();
+            sync_hist.record(precise_time_ns() - start_sync).unwrap();
         }
         let new_time = precise_time_ns();
-        append_hist.increment(new_time - time).unwrap();
+        append_hist.record(new_time - time).unwrap();
         time = new_time;
         small_rng.fill_bytes(&mut buf);
     }
@@ -126,7 +126,7 @@ fn append(args: &Args) {
     if args.flag_batch != 0 && entries % args.flag_batch != 0 {
         //segment.flush().await().unwrap();
         let new_time = precise_time_ns();
-        append_hist.increment(new_time - time).unwrap();
+        append_hist.record(new_time - time).unwrap();
     }
 
     let end_time = precise_time_ns();
@@ -140,7 +140,7 @@ fn append(args: &Args) {
     let time = end_time - start_time;
     let data = entries * entry_size;
     let rate = (data as f64 / (time as f64 / 1_000_000_000f64)) as usize;
-    let overhead_amount = segment.len() - data;
+    let overhead_amount = segment.len().saturating_sub(data);
     let overhead_rate = (overhead_amount as f64 / (time as f64 / 1_000_000_000f64)) as usize;
 
     println!(
@@ -154,48 +154,18 @@ fn append(args: &Args) {
     );
     println!(
         "append latency:\t\tp50: {:>7},\tp75: {:>7},\tp90: {:>7},\tp95: {:>7},\tp99: {:>7}",
-        append_hist
-            .percentile(0.5)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string()),
-        append_hist
-            .percentile(0.75)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string()),
-        append_hist
-            .percentile(0.90)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string()),
-        append_hist
-            .percentile(0.95)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string()),
-        append_hist
-            .percentile(0.99)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string())
+        format_duration(append_hist.value_at_percentile(0.5)),
+        format_duration(append_hist.value_at_percentile(0.75)),
+        format_duration(append_hist.value_at_percentile(0.90)),
+        format_duration(append_hist.value_at_percentile(0.95)),
+        format_duration(append_hist.value_at_percentile(0.99)),
     );
     println!(
         "sync latency:\t\tp50: {:>7},\tp75: {:>7},\tp90: {:>7},\tp95: {:>7},\tp99: {:>7}",
-        sync_hist
-            .percentile(0.5)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string()),
-        sync_hist
-            .percentile(0.75)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string()),
-        sync_hist
-            .percentile(0.90)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string()),
-        sync_hist
-            .percentile(0.95)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string()),
-        sync_hist
-            .percentile(0.99)
-            .map(format_duration)
-            .unwrap_or_else(|_| "na".to_string())
+        format_duration(sync_hist.value_at_percentile(0.5)),
+        format_duration(sync_hist.value_at_percentile(0.75)),
+        format_duration(sync_hist.value_at_percentile(0.90)),
+        format_duration(sync_hist.value_at_percentile(0.95)),
+        format_duration(sync_hist.value_at_percentile(0.99)),
     );
 }
