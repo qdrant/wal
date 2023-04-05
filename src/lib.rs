@@ -1,5 +1,5 @@
 use crossbeam_channel::{Receiver, Sender};
-use fs2::FileExt;
+use fs4::FileExt;
 use log::{debug, info, trace, warn};
 use std::cmp::Ordering;
 use std::fmt;
@@ -1027,7 +1027,7 @@ mod test {
         let dir = Builder::new().prefix("wal").tempdir().unwrap();
         let wal = Wal::open(dir.path()).unwrap();
         assert_eq!(
-            fs2::lock_contended_error().kind(),
+            fs4::lock_contended_error().kind(),
             Wal::open(dir.path()).unwrap_err().kind()
         );
         drop(wal);

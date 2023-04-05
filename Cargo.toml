@@ -7,11 +7,14 @@ edition = "2021"
 [dependencies]
 byteorder = "1.4"
 crc = "3"
-fs2 = "0.4"
 log = "0.4"
 memmap2 = "0.5.10"
 rand = "0.8.5"
 rand_distr = "0.4.3"
+fs4 = "0.6"
+# fs4 depends on rustix, but pulling this dependency explicitly into the tree
+# to use direct functions on FreeBSD
+rustix = { version = "0", features = [ "fs" ]}
 crossbeam-channel = "0.5.7"
 
 # Binary dependencies
