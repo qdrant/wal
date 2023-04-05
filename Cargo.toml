@@ -15,7 +15,7 @@ fs4 = "0.6"
 # fs4 depends on rustix, but pulling this dependency explicitly into the tree
 # to use direct functions on FreeBSD
 rustix = { version = "0", features = [ "fs" ]}
-crossbeam-channel = "0.5.7"
+crossbeam-channel = "0.5"
 
 # Binary dependencies
 docopt = "1.1"
