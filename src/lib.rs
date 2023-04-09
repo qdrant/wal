@@ -93,6 +93,24 @@ impl Wal {
         Wal::with_options(path, &WalOptions::default())
     }
 
+    pub fn generate_empty_wal_starting_at_index(
+        path: impl Into<PathBuf>,
+        options: &WalOptions,
+        index: u64,
+    ) -> Result<()> {
+        let open_id = 0;
+        let mut path_buf = path.into();
+        path_buf.push(format!("open-{open_id}"));
+        let segment = OpenSegment {
+            id: index + 1,
+            segment: Segment::create(&path_buf, options.segment_capacity)?,
+        };
+
+        let mut close_segment = close_segment(segment, index + 1)?;
+
+        close_segment.segment.flush()
+    }
+
     pub fn with_options<P>(path: P, options: &WalOptions) -> Result<Wal>
     where
         P: AsRef<Path>,
@@ -238,6 +256,14 @@ impl Wal {
         self.flush = Some(segment.segment.flush_async());
 
         let start_index = self.open_segment_start_index();
+
+        // If there is an empty closed segment, remove it before adding the new one.
+        if let Some(last_closed) = self.closed_segments.last() {
+            if last_closed.segment.is_empty() {
+                self.closed_segments.pop();
+            }
+        }
+
         self.closed_segments
             .push(close_segment(segment, start_index)?);
         debug!(
@@ -437,11 +463,7 @@ impl Wal {
     /// The index of the last entry
     pub fn last_index(&self) -> u64 {
         let num_entries = self.num_entries();
-        if num_entries != 0 {
-            self.first_index() + num_entries - 1
-        } else {
-            0
-        }
+        (self.first_index() + num_entries).saturating_sub(1)
     }
 
     /// Remove all entries
@@ -636,6 +658,78 @@ mod test {
         let _ = env_logger::builder().is_test(true).try_init();
     }
 
+    #[test]
+    fn test_create_empty_wal_with_initial_id() {
+        init_logger();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
+        let options = WalOptions {
+            segment_capacity: 80,
+            segment_queue_len: 3,
+        };
+
+        // Create empty wal with initial id 10.
+        let init_offset = 10;
+        Wal::generate_empty_wal_starting_at_index(dir.path(), &options, init_offset).unwrap();
+
+        let mut wal = Wal::with_options(dir.path(), &options).unwrap();
+
+        let last_index = wal.last_index();
+
+        assert_eq!(last_index, init_offset);
+
+        assert_eq!(wal.num_entries(), 0);
+
+        let next_entry: Vec<u8> = vec![1, 2, 3];
+
+        wal.append(&next_entry).unwrap();
+
+        let last_index = wal.last_index();
+        assert_eq!(last_index, init_offset + 1);
+
+        assert_eq!(wal.num_entries(), 1);
+
+        let entry_count = 50;
+
+        let entries = EntryGenerator::new().take(entry_count).collect::<Vec<_>>();
+
+        for entry in &entries {
+            wal.append(entry).unwrap();
+        }
+
+        let last_index = wal.last_index();
+        assert_eq!(last_index, init_offset + 1 + entry_count as u64);
+
+        assert_eq!(wal.num_entries(), 1 + entry_count as u64);
+
+        // read random entry back to make sure it is correct.
+
+        let entry_index = init_offset + 1;
+        let entry = wal.entry(entry_index).unwrap();
+        assert_eq!(next_entry[..], entry[..]);
+
+        let entry_index = init_offset + 1 + entry_count as u64;
+        let entry = wal.entry(entry_index).unwrap();
+        assert_eq!(entries[entry_count - 1][..], entry[..]);
+
+        let entry_index = init_offset + 1 + 10;
+        let entry = wal.entry(entry_index).unwrap();
+        assert_eq!(entries[9][..], entry[..]);
+
+        wal.prefix_truncate(init_offset).unwrap();
+
+        assert_eq!(wal.num_entries(), entry_count as u64 + 1);
+
+        wal.prefix_truncate(init_offset + 20).unwrap();
+
+        assert!(wal.num_entries() < entry_count as u64 + 1);
+
+        let truncate_index = init_offset + 30;
+        wal.truncate(truncate_index).unwrap();
+
+        let last_index = wal.last_index();
+        assert_eq!(last_index, truncate_index - 1);
+    }
+
     /// Check that entries appended to the write ahead log can be read back.
     #[test]
     fn check_wal() {
@@ -691,6 +785,12 @@ mod test {
             for entry in &entries {
                 wal.append(entry).unwrap();
             }
+            if entries.is_empty() {
+                assert_eq!(wal.last_index(), 0);
+            } else {
+                assert_eq!(wal.last_index(), entries.len() as u64 - 1);
+            }
+
             let last_index = wal.last_index();
             if wal.entry(last_index).is_none() && wal.num_entries() != 0 {
                 return TestResult::failed();
