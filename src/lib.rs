@@ -261,7 +261,6 @@ impl Wal {
         if let Some(last_closed) = self.closed_segments.last() {
             if last_closed.segment.is_empty() {
                 let empty_segment = self.closed_segments.pop().unwrap();
-
                 empty_segment.segment.delete()?;
             }
         }
@@ -704,18 +703,19 @@ mod test {
         assert_eq!(wal.num_entries(), 1 + entry_count as u64);
 
         // read random entry back to make sure it is correct.
+        {
+            let entry_index = init_offset + 1;
+            let entry = wal.entry(entry_index).unwrap();
+            assert_eq!(next_entry[..], entry[..]);
 
-        let entry_index = init_offset + 1;
-        let entry = wal.entry(entry_index).unwrap();
-        assert_eq!(next_entry[..], entry[..]);
+            let entry_index = init_offset + 1 + entry_count as u64;
+            let entry = wal.entry(entry_index).unwrap();
+            assert_eq!(entries[entry_count - 1][..], entry[..]);
 
-        let entry_index = init_offset + 1 + entry_count as u64;
-        let entry = wal.entry(entry_index).unwrap();
-        assert_eq!(entries[entry_count - 1][..], entry[..]);
-
-        let entry_index = init_offset + 1 + 10;
-        let entry = wal.entry(entry_index).unwrap();
-        assert_eq!(entries[9][..], entry[..]);
+            let entry_index = init_offset + 1 + 10;
+            let entry = wal.entry(entry_index).unwrap();
+            assert_eq!(entries[9][..], entry[..]);
+        }
 
         wal.prefix_truncate(init_offset).unwrap();
 
