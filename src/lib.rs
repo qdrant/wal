@@ -260,7 +260,9 @@ impl Wal {
         // If there is an empty closed segment, remove it before adding the new one.
         if let Some(last_closed) = self.closed_segments.last() {
             if last_closed.segment.is_empty() {
-                self.closed_segments.pop();
+                let empty_segment= self.closed_segments.pop().unwrap();
+
+                empty_segment.segment.delete()?;
             }
         }
 
