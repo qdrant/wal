@@ -174,10 +174,14 @@ impl Segment {
                 LittleEndian::write_u32(&mut segment[4..], seed);
             }
 
+            // From "man 2 close":
+            // > A successful close does not guarantee that the data has been successfully saved to disk, as the kernel defers writes.
+            // So we need to flush magic header manually to ensure that it is written to disk.
+            mmap.flush()?;
+
             // Manually sync each file in Windows since sync-ing cannot be done for the whole directory.
             #[cfg(target_os = "windows")]
             {
-                mmap.flush()?;
                 file.sync_all()?;
             }
         };
