@@ -95,7 +95,7 @@ mod test {
         let generator = EntryGenerator::new();
         let mut sizes: Vec<usize> = generator
             .into_iter()
-            .take(100)
+            .take(1000)
             .map(|entry| entry.len())
             .collect();
 
