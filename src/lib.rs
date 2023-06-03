@@ -464,7 +464,7 @@ impl Wal {
     /// The index of the last entry
     pub fn last_index(&self) -> u64 {
         let num_entries = self.num_entries();
-        (self.first_index() + num_entries).saturating_sub(1)
+        self.first_index() + num_entries.saturating_sub(1)
     }
 
     /// Remove all entries
@@ -660,6 +660,51 @@ mod test {
     }
 
     #[test]
+    fn test_generate_empty_wal() {
+        init_logger();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
+        let options = WalOptions {
+            segment_capacity: 80,
+            segment_queue_len: 3,
+        };
+
+        // Create empty wal with initial id 10.
+        let init_offset = 10;
+        Wal::generate_empty_wal_starting_at_index(dir.path(), &options, init_offset).unwrap();
+
+        let mut wal = Wal::with_options(dir.path(), &options).unwrap();
+
+        let first_index = wal.first_index();
+        let last_index = wal.last_index();
+        let num_entries = wal.num_entries();
+
+        assert!(first_index <= last_index);
+        assert_eq!(num_entries, 0);
+
+        let next_entry: Vec<u8> = vec![1, 2, 3];
+        let op = wal.append(&next_entry).unwrap();
+
+        assert!(op > init_offset);
+
+        let first_index = wal.first_index();
+        let last_index = wal.last_index();
+        let num_entries = wal.num_entries();
+
+        assert!(first_index <= last_index);
+        assert_eq!(num_entries, 1);
+
+        wal.append(&next_entry).unwrap();
+        wal.append(&next_entry).unwrap();
+
+        let first_index = wal.first_index();
+        let last_index = wal.last_index();
+        let num_entries = wal.num_entries();
+
+        assert!(first_index <= last_index);
+        assert_eq!(num_entries, 3);
+    }
+
+    #[test]
     fn test_create_empty_wal_with_initial_id() {
         init_logger();
         let dir = Builder::new().prefix("wal").tempdir().unwrap();
@@ -676,7 +721,7 @@ mod test {
 
         let last_index = wal.last_index();
 
-        assert_eq!(last_index, init_offset);
+        assert!(last_index > init_offset);
 
         assert_eq!(wal.num_entries(), 0);
 
