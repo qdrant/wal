@@ -1,7 +1,15 @@
 [package]
 name = "wal"
 version = "0.1.2"
-authors = ["Dan Burkert <dan@danburkert.com>", "Andrey Vasnetsov <andrey@vasnetsov.com>"]
+authors = [
+    "Dan Burkert <dan@danburkert.com>",
+    "Andrey Vasnetsov <andrey@vasnetsov.com>",
+    "Qdrant Team <info@qdrant.tech>",
+]
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://qdrant.tech/"
+repository = "https://github.com/qdrant/wal"
 edition = "2021"
 
 [dependencies]
