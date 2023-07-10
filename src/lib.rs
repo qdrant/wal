@@ -514,7 +514,7 @@ fn open_dir_entry(entry: fs::DirEntry) -> Result<Option<WalSegment>> {
     };
 
     if !metadata.is_file() {
-        return Err(error());
+        return Ok(None); // ignore non-files
     }
 
     let filename = entry.file_name().into_string().map_err(|_| error())?;
