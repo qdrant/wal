@@ -192,7 +192,7 @@ impl Segment {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
-            .create(true)
+            .create(false)
             .open(&path)?;
 
         let mmap = MmapViewSync::from_file(&file, 0, capacity)?;
