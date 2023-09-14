@@ -24,6 +24,7 @@ fs4 = "0.6"
 # to use direct functions on FreeBSD
 rustix = { version = "0", features = [ "fs" ]}
 crossbeam-channel = "0.5"
+parking_lot = { version = "0.12.1", features=["deadlock_detection"] }
 
 # Binary dependencies
 docopt = "1.1"

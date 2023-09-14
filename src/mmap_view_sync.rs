@@ -1,4 +1,5 @@
 use memmap2::{MmapMut, MmapOptions};
+use parking_lot::Mutex;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::fs::File;
@@ -13,7 +14,7 @@ use std::sync::Arc;
 /// The view may be split into disjoint ranges, each of which will share the
 /// underlying memory map.
 pub struct MmapViewSync {
-    inner: Arc<UnsafeCell<MmapMut>>,
+    inner: Arc<Mutex<UnsafeCell<MmapMut>>>,
     offset: usize,
     len: usize,
 }
@@ -87,7 +88,7 @@ impl MmapViewSync {
     ///
     /// The caller must ensure that memory outside the `offset`/`len` range is not accessed.
     fn inner(&self) -> &MmapMut {
-        unsafe { &*self.inner.get() }
+        unsafe { &*self.inner.lock().get() }
     }
 
     /// Get a mutable reference to the inner mmap.
@@ -95,7 +96,7 @@ impl MmapViewSync {
     /// The caller must ensure that memory outside the `offset`/`len` range is not accessed.
     #[allow(clippy::mut_from_ref)]
     fn inner_mut(&self) -> &mut MmapMut {
-        unsafe { &mut *self.inner.get() }
+        unsafe { &mut *self.inner.lock().get() }
     }
 
     /// Flushes outstanding view modifications to disk.
@@ -147,7 +148,7 @@ impl From<MmapMut> for MmapViewSync {
     fn from(mmap: MmapMut) -> MmapViewSync {
         let len = mmap.len();
         MmapViewSync {
-            inner: Arc::new(UnsafeCell::new(mmap)),
+            inner: Arc::new(Mutex::new(UnsafeCell::new(mmap))),
             offset: 0,
             len,
         }
