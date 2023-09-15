@@ -104,7 +104,7 @@ impl MmapViewSync {
     /// map view are guaranteed to be durably stored. The file's metadata (including last
     /// modification timestamp) may not be updated.
     pub fn flush(&self) -> Result<()> {
-        self.inner_mut().flush_range(self.offset, self.len)
+        self.inner().flush_range(self.offset, self.len)
     }
 
     /// Returns the length of the memory map view.
