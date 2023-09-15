@@ -171,6 +171,7 @@ impl fmt::Debug for MmapViewSync {
     }
 }
 
+#[cfg(test)]
 unsafe impl Sync for MmapViewSync {}
 unsafe impl Send for MmapViewSync {}
 
