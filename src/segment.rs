@@ -306,14 +306,6 @@ impl Segment {
         unsafe { self.mmap.as_mut_slice() }
     }
 
-    fn flush_offset(&self) -> usize {
-        self.flush_offset
-    }
-
-    fn set_flush_offset(&mut self, offset: usize) {
-        self.flush_offset = offset;
-    }
-
     /// Returns the segment entry at the specified index, or `None` if no such
     /// entry exists.
     pub fn entry(&self, index: usize) -> Option<Entry> {
@@ -430,7 +422,7 @@ impl Segment {
                 // flush new elements added since last flush
                 trace!("{:?}: flushing byte range [{}, {})", self, start, end);
                 let mut view = unsafe { self.mmap.clone() };
-                self.set_flush_offset(end);
+                self.flush_offset = end;
                 view.restrict(start, end - start)?;
                 view.flush()
             }
@@ -439,7 +431,7 @@ impl Segment {
                 // register new flush offset & flush the whole segment
                 trace!("{:?}: flushing after truncation", self);
                 let view = unsafe { self.mmap.clone() };
-                self.set_flush_offset(end);
+                self.flush_offset = end;
                 view.flush()
             }
         }
@@ -448,7 +440,7 @@ impl Segment {
     /// Flushes recently written entries to durable storage.
     pub fn flush_async(&mut self) -> thread::JoinHandle<Result<()>> {
         trace!("{:?}: async flushing", self);
-        let start = self.flush_offset();
+        let start = self.flush_offset;
         let end = self.size();
 
         match start.cmp(&end) {
@@ -456,7 +448,7 @@ impl Segment {
             Ordering::Less => {
                 // flush new elements added since last flush
                 let mut view = unsafe { self.mmap.clone() };
-                self.set_flush_offset(end);
+                self.flush_offset = end;
 
                 let log_msg = if log_enabled!(log::Level::Trace) {
                     format!(
@@ -476,7 +468,7 @@ impl Segment {
                 // most likely truncated in between flushes
                 // register new flush offset & flush the whole segment
                 let view = unsafe { self.mmap.clone() };
-                self.set_flush_offset(end);
+                self.flush_offset = end;
 
                 let log_msg = if log_enabled!(log::Level::Trace) {
                     format!("{:?}: async flushing after truncation", &self)
