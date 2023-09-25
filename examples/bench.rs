@@ -42,7 +42,9 @@ fn main() {
 }
 
 pub fn precise_time_ns() -> u64 {
-    chrono::offset::Utc::now().timestamp_nanos() as u64
+    chrono::offset::Utc::now()
+        .timestamp_nanos_opt()
+        .expect("timestamp after year 2262") as u64
 }
 
 fn format_duration(n: u64) -> String {
