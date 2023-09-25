@@ -147,6 +147,7 @@ impl From<MmapMut> for MmapViewSync {
     fn from(mmap: MmapMut) -> MmapViewSync {
         let len = mmap.len();
         MmapViewSync {
+            #[allow(clippy::arc_with_non_send_sync)]
             inner: Arc::new(UnsafeCell::new(mmap)),
             offset: 0,
             len,
