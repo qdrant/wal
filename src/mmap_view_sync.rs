@@ -85,6 +85,9 @@ impl MmapViewSync {
 
     /// Get a reference to the inner mmap.
     ///
+    /// ## Unsafety
+    ///
+    /// The caller must ensure that the file is not concurrently modified.
     /// The caller must ensure that memory outside the `offset`/`len` range is not accessed.
     fn inner(&self) -> &MmapMut {
         unsafe { &*self.inner.get() }
@@ -92,9 +95,11 @@ impl MmapViewSync {
 
     /// Get a mutable reference to the inner mmap.
     ///
+    /// ## Unsafety
+    ///
+    /// The caller must ensure that the file is not concurrently modified.
     /// The caller must ensure that memory outside the `offset`/`len` range is not accessed.
-    #[allow(clippy::mut_from_ref)]
-    fn inner_mut(&self) -> &mut MmapMut {
+    fn inner_mut(&mut self) -> &mut MmapMut {
         unsafe { &mut *self.inner.get() }
     }
 
@@ -104,7 +109,7 @@ impl MmapViewSync {
     /// map view are guaranteed to be durably stored. The file's metadata (including last
     /// modification timestamp) may not be updated.
     pub fn flush(&self) -> Result<()> {
-        self.inner_mut().flush_range(self.offset, self.len)
+        self.inner().flush_range(self.offset, self.len)
     }
 
     /// Returns the length of the memory map view.
@@ -127,7 +132,8 @@ impl MmapViewSync {
     ///
     /// The caller must ensure that the file is not concurrently accessed.
     pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
-        &mut self.inner_mut()[self.offset..self.offset + self.len]
+        let (offset, len) = (self.offset, self.len);
+        &mut self.inner_mut()[offset..offset + len]
     }
 
     /// Clones the view of the memory map.
@@ -165,6 +171,7 @@ impl fmt::Debug for MmapViewSync {
     }
 }
 
+#[cfg(test)]
 unsafe impl Sync for MmapViewSync {}
 unsafe impl Send for MmapViewSync {}
 
