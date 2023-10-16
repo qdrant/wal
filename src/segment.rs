@@ -563,12 +563,44 @@ impl Segment {
     where
         P: AsRef<Path>,
     {
+        // When running on a Docker volume mounted on Windows
+        // the thread that creates the mmap keeps the original file opened.
+        // When we try to rename it in this state, this leads to the file being
+        // shown as corrupted. If an external process tries to do something with this file (for example open it)
+        // it gets "File not found error". To avoid this, the file handle needs to be released before renaming it.
+        // Because the underlying mmap is responsible for it, we need to unload it first.
+        self.unload_mmap()?;
         debug!("{:?}: renaming file to {:?}", self, path.as_ref());
         fs::rename(&self.path, &path).map_err(|e| {
             error!("{:?}: failed to rename segment {}", self.path, e);
             e
         })?;
         self.path = path.as_ref().to_path_buf();
+
+        // After the file is successfully renamed, the mmap needs to be loaded again from the main thread
+        // so it can be used for WAL operations.
+        self.reload_mmap()?;
+        Ok(())
+    }
+
+    /// Unloads the mmap by replacing it with an empty one. This is used to release the underlying file
+    /// used by the mmap.
+    fn unload_mmap(&mut self) -> Result<()> {
+        self.mmap.flush()?;
+        let _ = std::mem::replace(&mut self.mmap, MmapViewSync::anonymous(0)?);
+        Ok(())
+    }
+
+    /// Reloads the mmap by mmaping the file again.
+    fn reload_mmap(&mut self) -> Result<()> {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(false)
+            .open(&self.path)
+            .unwrap();
+        let capacity = (file.metadata()?.len() as usize) & !7;
+        self.mmap = MmapViewSync::from_file(&file, 0, capacity)?;
         Ok(())
     }
 
