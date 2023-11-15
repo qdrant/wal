@@ -2,6 +2,7 @@ use log::{debug, error, log_enabled, trace};
 use std::cmp::Ordering;
 use std::fmt;
 use std::fs::{self, OpenOptions};
+use std::hash::Hasher;
 use std::io::{Error, ErrorKind, Result};
 use std::mem;
 use std::ops::Deref;
@@ -13,7 +14,6 @@ use std::time::Duration;
 
 use crate::mmap_view_sync::MmapViewSync;
 use byteorder::{ByteOrder, LittleEndian};
-use crc::{Crc, CRC_32_ISCSI};
 #[cfg(not(unix))]
 use fs4::FileExt;
 
@@ -26,8 +26,6 @@ const HEADER_LEN: usize = 8;
 
 /// The length of a CRC value.
 const CRC_LEN: usize = 4;
-
-pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
 
 pub struct Entry {
     view: MmapViewSync,
@@ -264,9 +262,9 @@ impl Segment {
                 if offset + HEADER_LEN + padded_len + CRC_LEN > capacity {
                     break;
                 }
-                let mut digest = CASTAGNOLI.digest_with_initial(crc);
-                digest.update(&segment[offset..offset + HEADER_LEN + padded_len]);
-                let entry_crc = digest.finalize();
+                let mut digest = crc32c::Crc32cHasher::new(crc);
+                digest.write(&segment[offset..offset + HEADER_LEN + padded_len]);
+                let entry_crc = digest.finish() as u32;
                 let stored_crc =
                     LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]);
                 if entry_crc != stored_crc {
@@ -340,7 +338,7 @@ impl Segment {
         let offset = self.size();
 
         let mut crc = self.crc;
-        let mut digest = CASTAGNOLI.digest_with_initial(crc);
+        let mut digest = crc32c::Crc32cHasher::new(crc);
 
         LittleEndian::write_u64(&mut self.as_mut_slice()[offset..], entry.len() as u64);
         copy_memory(
@@ -355,8 +353,8 @@ impl Segment {
                 &mut self.as_mut_slice()[offset + HEADER_LEN + entry.len()..],
             );
         }
-        digest.update(&self.as_slice()[offset..offset + HEADER_LEN + padded_len]);
-        crc = digest.finalize();
+        digest.write(&self.as_slice()[offset..offset + HEADER_LEN + padded_len]);
+        crc = digest.finish() as u32;
 
         LittleEndian::write_u32(
             &mut self.as_mut_slice()[offset + HEADER_LEN + padded_len..],
@@ -874,5 +872,36 @@ mod test {
             ErrorKind::NotFound,
             Segment::open(&path).unwrap_err().kind()
         );
+    }
+
+    use rand::{rngs::OsRng, RngCore};
+    use std::hash::Hasher;
+
+    #[test]
+    fn test_crc32c() {
+        let message = b"123456789";
+        let crc = crc32c::crc32c(message);
+        assert_eq!(crc, crc::CRC_32_ISCSI.check);
+
+        let mut hasher = crc32c::Crc32cHasher::default();
+        hasher.write(message);
+        assert_eq!(hasher.finish() as u32, crc::CRC_32_ISCSI.check);
+    }
+
+    #[test]
+    fn test_crc32c_accuracy() {
+        let mut buffer = [0u8; 8192];
+        let castagnoli = crc::Crc::<u32>::new(&crc::CRC_32_ISCSI);
+
+        (0..1024).for_each(|_| {
+            OsRng.fill_bytes(&mut buffer);
+            let mut digest = castagnoli.digest();
+            digest.update(&buffer);
+            let crc1 = digest.finalize();
+
+            let crc2 = crc32c::crc32c(&buffer);
+
+            assert_eq!(crc1, crc2);
+        });
     }
 }
