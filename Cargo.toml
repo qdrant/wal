@@ -14,7 +14,7 @@ edition = "2021"
 
 [dependencies]
 byteorder = "1.4"
-crc32c = "0.6.4"
+crc32c = { git = "https://github.com/lizhanhui/crc32c.git", branch = "master", default-features = false }
 log = "0.4"
 memmap2 = "0.9.0"
 rand = "0.8.5"
@@ -42,3 +42,7 @@ criterion = "0.5.1"
 [[bench]]
 name = "benchmark"
 harness = false
+
+[features]
+default = ["simd"]
+simd = ["crc32c/x86_64", "crc32c/aarch64"]
