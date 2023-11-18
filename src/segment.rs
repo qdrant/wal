@@ -2,7 +2,6 @@ use log::{debug, error, log_enabled, trace};
 use std::cmp::Ordering;
 use std::fmt;
 use std::fs::{self, OpenOptions};
-use std::hash::Hasher;
 use std::io::{Error, ErrorKind, Result};
 use std::mem;
 use std::ops::Deref;
