@@ -262,9 +262,10 @@ impl Segment {
                 if offset + HEADER_LEN + padded_len + CRC_LEN > capacity {
                     break;
                 }
-                let mut digest = crc32c::Crc32cHasher::new(crc);
-                digest.write(&segment[offset..offset + HEADER_LEN + padded_len]);
-                let entry_crc = digest.finish() as u32;
+                let entry_crc = crc32c::crc32c_append(
+                    !crc.reverse_bits(),
+                    &segment[offset..offset + HEADER_LEN + padded_len],
+                );
                 let stored_crc =
                     LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]);
                 if entry_crc != stored_crc {
@@ -338,7 +339,6 @@ impl Segment {
         let offset = self.size();
 
         let mut crc = self.crc;
-        let mut digest = crc32c::Crc32cHasher::new(crc);
 
         LittleEndian::write_u64(&mut self.as_mut_slice()[offset..], entry.len() as u64);
         copy_memory(
@@ -353,8 +353,10 @@ impl Segment {
                 &mut self.as_mut_slice()[offset + HEADER_LEN + entry.len()..],
             );
         }
-        digest.write(&self.as_slice()[offset..offset + HEADER_LEN + padded_len]);
-        crc = digest.finish() as u32;
+        crc = crc32c::crc32c_append(
+            !crc.reverse_bits(),
+            &self.as_slice()[offset..offset + HEADER_LEN + padded_len],
+        );
 
         LittleEndian::write_u32(
             &mut self.as_mut_slice()[offset + HEADER_LEN + padded_len..],
@@ -898,9 +900,23 @@ mod test {
             let mut digest = castagnoli.digest();
             digest.update(&buffer);
             let crc1 = digest.finalize();
-
             let crc2 = crc32c::crc32c(&buffer);
+            assert_eq!(crc1, crc2);
+        });
+    }
 
+    #[test]
+    fn test_crc32c_with_arbitrary_initial_value() {
+        let mut buffer = [0u8; 8192];
+        let castagnoli = crc::Crc::<u32>::new(&crc::CRC_32_ISCSI);
+
+        (0..1024).for_each(|seed| {
+            OsRng.fill_bytes(&mut buffer);
+            let mut digest = castagnoli.digest_with_initial(seed);
+            digest.update(&buffer);
+            let crc1 = digest.finalize();
+
+            let crc2 = crc32c::crc32c_append(!seed.reverse_bits(), &buffer);
             assert_eq!(crc1, crc2);
         });
     }
