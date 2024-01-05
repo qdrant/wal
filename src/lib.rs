@@ -1,6 +1,6 @@
 use crossbeam_channel::{Receiver, Sender};
 use fs4::FileExt;
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use std::cmp::Ordering;
 use std::fmt;
 use std::fs::{self, File};
@@ -491,15 +491,27 @@ impl fmt::Debug for Wal {
     }
 }
 
-fn close_segment(mut segment: OpenSegment, start_index: u64) -> Result<ClosedSegment> {
+fn close_segment(segment: OpenSegment, start_index: u64) -> Result<ClosedSegment> {
+    let old_path = segment.segment.path().to_owned();
     let new_path = segment
         .segment
         .path()
         .with_file_name(format!("closed-{start_index}"));
-    segment.segment.rename(new_path)?;
+
+    debug!("{:?}: renaming file to {:?}", &segment, &new_path);
+
+    // close open segment before renaming
+    std::mem::drop(segment);
+
+    fs::rename(&old_path, &new_path).map_err(|e| {
+        error!("{:?}: failed to rename segment {}", &old_path, e);
+        e
+    })?;
+
+    let segment = Segment::open(&new_path)?;
     Ok(ClosedSegment {
         start_index,
-        segment: segment.segment,
+        segment,
     })
 }
 

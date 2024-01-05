@@ -8,7 +8,6 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::thread;
-#[cfg(target_os = "windows")]
 use std::time::Duration;
 
 use crate::mmap_view_sync::MmapViewSync;
@@ -554,48 +553,10 @@ impl Segment {
         &self.path
     }
 
-    /// Renames the segment file.
-    ///
-    /// The caller is responsible for syncing the directory in order to
-    /// guarantee that the rename is durable in the event of a crash.
-    pub fn rename<P>(&mut self, path: P) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
-        debug!("{:?}: renaming file to {:?}", self, path.as_ref());
-        fs::rename(&self.path, &path).map_err(|e| {
-            error!("{:?}: failed to rename segment {}", self.path, e);
-            e
-        })?;
-        self.path = path.as_ref().to_path_buf();
-        Ok(())
-    }
-
     /// Deletes the segment file.
     pub fn delete(self) -> Result<()> {
         debug!("{:?}: deleting file", self);
 
-        #[cfg(not(target_os = "windows"))]
-        {
-            self.delete_unix()
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            self.delete_windows()
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    fn delete_unix(self) -> Result<()> {
-        fs::remove_file(&self.path).map_err(|e| {
-            error!("{:?}: failed to delete segment {}", self, e);
-            e
-        })
-    }
-
-    #[cfg(target_os = "windows")]
-    fn delete_windows(self) -> Result<()> {
         const DELETE_TRIES: u32 = 3;
 
         let Segment {
@@ -607,10 +568,12 @@ impl Segment {
         } = self;
         let mmap_len = mmap.len();
 
-        // Unmaps the file before `fs::remove_file` else access will be denied
+        // Unmaps the file before `fs::remove_file`
+        // else access will be denied on Windows or Docker containers with Windows host
         mmap.flush()?;
         std::mem::drop(mmap);
 
+        // Do several attempts to delete the file because on Windows it may be denied
         let mut tries = 0;
         loop {
             tries += 1;
