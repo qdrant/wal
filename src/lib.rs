@@ -471,6 +471,18 @@ impl Wal {
     pub fn clear(&mut self) -> Result<()> {
         self.truncate(self.first_index())
     }
+
+    /// copy all files to the given path directory
+    pub fn save_to_path<P>(&self, path: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        self.open_segment.segment.save_to_path(&path)?;
+        for segment in &self.closed_segments {
+            segment.segment.save_to_path(&path)?;
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Debug for Wal {

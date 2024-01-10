@@ -643,6 +643,22 @@ impl Segment {
             }
         }
     }
+
+    pub fn save_to_path<P>(&self, path: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let file_name = self.path.file_name().unwrap();
+        let dst_path = path.as_ref().to_owned().join(file_name);
+        let mut other = Self::create(dst_path, self.capacity())?;
+        unsafe {
+            other
+                .mmap
+                .as_mut_slice()
+                .copy_from_slice(self.mmap.as_slice());
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Debug for Segment {
