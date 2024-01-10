@@ -158,7 +158,7 @@ impl Wal {
         // Validate the closed segments. They must be non-overlapping, and contiguous.
         closed_segments.sort_by(|a, b| a.start_index.cmp(&b.start_index));
         let mut next_start_index = closed_segments
-            .get(0)
+            .first()
             .map_or(0, |segment| segment.start_index);
         for &ClosedSegment {
             start_index,
@@ -393,7 +393,7 @@ impl Wal {
         if until
             <= self
                 .closed_segments
-                .get(0)
+                .first()
                 .map_or(0, |segment| segment.start_index)
         {
             // Do nothing, the first entry is already greater than `until`.
@@ -449,7 +449,7 @@ impl Wal {
         self.open_segment_start_index()
             - self
                 .closed_segments
-                .get(0)
+                .first()
                 .map_or(0, |segment| segment.start_index)
             + self.open_segment.segment.len() as u64
     }
@@ -457,7 +457,7 @@ impl Wal {
     /// The index of the first entry.
     pub fn first_index(&self) -> u64 {
         self.closed_segments
-            .get(0)
+            .first()
             .map_or(0, |segment| segment.start_index)
     }
 
@@ -477,7 +477,7 @@ impl fmt::Debug for Wal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let start_index = self
             .closed_segments
-            .get(0)
+            .first()
             .map_or(0, |segment| segment.start_index);
         let end_index = self.open_segment_start_index() + self.open_segment.segment.len() as u64;
         write!(
