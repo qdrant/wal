@@ -644,13 +644,11 @@ impl Segment {
         }
     }
 
-    pub fn save_to_path<P>(&self, path: P) -> Result<()>
+    pub(crate) fn copy_to_path<P>(&self, path: P) -> Result<()>
     where
         P: AsRef<Path>,
     {
-        let file_name = self.path.file_name().unwrap();
-        let dst_path = path.as_ref().to_owned().join(file_name);
-        let mut other = Self::create(dst_path, self.capacity())?;
+        let mut other = Self::create(path, self.capacity())?;
         unsafe {
             other
                 .mmap
