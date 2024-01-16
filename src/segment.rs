@@ -648,6 +648,13 @@ impl Segment {
     where
         P: AsRef<Path>,
     {
+        if path.as_ref().exists() {
+            return Err(Error::new(
+                ErrorKind::AlreadyExists,
+                format!("Path {:?} already exists", path.as_ref()),
+            ));
+        }
+
         let mut other = Self::create(path, self.capacity())?;
         unsafe {
             other
