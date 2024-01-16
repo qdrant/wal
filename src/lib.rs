@@ -489,7 +489,12 @@ impl Wal {
         let close_segment_files: HashMap<_, _> = self
             .closed_segments
             .iter()
-            .map(|segment| (segment.segment.path().file_name().unwrap(), &segment.segment))
+            .map(|segment| {
+                (
+                    segment.segment.path().file_name().unwrap(),
+                    &segment.segment,
+                )
+            })
             .collect();
 
         for entry in fs::read_dir(self.path())? {
