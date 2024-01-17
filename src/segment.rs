@@ -643,6 +643,27 @@ impl Segment {
             }
         }
     }
+
+    pub(crate) fn copy_to_path<P>(&self, path: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        if path.as_ref().exists() {
+            return Err(Error::new(
+                ErrorKind::AlreadyExists,
+                format!("Path {:?} already exists", path.as_ref()),
+            ));
+        }
+
+        let mut other = Self::create(path, self.capacity())?;
+        unsafe {
+            other
+                .mmap
+                .as_mut_slice()
+                .copy_from_slice(self.mmap.as_slice());
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Debug for Segment {
