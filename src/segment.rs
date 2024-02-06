@@ -152,6 +152,7 @@ impl Segment {
                 .read(true)
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(&tmp_file_path)?;
 
             // fs4 provides some cross-platform bindings which help for Windows.
