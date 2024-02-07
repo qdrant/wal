@@ -268,10 +268,7 @@ impl Wal {
 
         self.closed_segments
             .push(close_segment(segment, start_index)?);
-        debug!(
-            "{:?}: open segment retired. start_index: {}",
-            self, start_index
-        );
+        debug!("{self:?}: open segment retired. start_index: {start_index}");
         Ok(())
     }
 
@@ -389,32 +386,37 @@ impl Wal {
     ///
     /// After calling this method, the `first_index` will be between the current
     /// `first_index` (inclusive), and `until` (exclusive).
+    ///
+    /// This always keeps at least one closed segment.
     pub fn prefix_truncate(&mut self, until: u64) -> Result<()> {
-        trace!("{:?}: prefix_truncate until entry {}", self, until);
+        trace!("{self:?}: prefix_truncate until entry {until}");
+
+        // Return early if everything up to `until` has already been truncated
         if until
             <= self
                 .closed_segments
                 .first()
                 .map_or(0, |segment| segment.start_index)
         {
-            // Do nothing, the first entry is already greater than `until`.
-        } else if until >= self.open_segment_start_index() {
-            // Truncate all but one closed segments.
-            // At least one closed segment is required to store information
-            if !self.closed_segments.is_empty() {
-                for segment in self.closed_segments.drain(..self.closed_segments.len() - 1) {
-                    segment.segment.delete()?
-                }
-            }
-        } else {
-            let mut index = self.find_closed_segment(until).unwrap();
-            if index == self.closed_segments.len() {
-                index = self.closed_segments.len() - 1;
-            }
-            trace!("PREFIX TRUNCATING UNTIL SEGMENT {}", index);
-            for segment in self.closed_segments.drain(..index) {
+            return Ok(());
+        }
+
+        // If `until` goes into or above our open segment, delete all but the last closed segments
+        if until >= self.open_segment_start_index() {
+            for segment in self
+                .closed_segments
+                .drain(..self.closed_segments.len().saturating_sub(1))
+            {
                 segment.segment.delete()?
             }
+            return Ok(());
+        }
+
+        // Delete all closed segments before the one `until` is in
+        let index = self.find_closed_segment(until).unwrap();
+        trace!("{self:?}: prefix truncating until segment {index}");
+        for segment in self.closed_segments.drain(..index) {
+            segment.segment.delete()?
         }
         Ok(())
     }
