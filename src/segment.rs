@@ -152,7 +152,8 @@ impl Segment {
                 .read(true)
                 .write(true)
                 .create(true)
-                .truncate(true)
+                // Don't truncate now, we do it manually later to allocate the right size directly
+                .truncate(false)
                 .open(&tmp_file_path)?;
 
             // fs4 provides some cross-platform bindings which help for Windows.
