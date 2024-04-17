@@ -953,8 +953,8 @@ mod test {
                 // Create fake temp file to simulate a crash.
                 let mut file = std::fs::OpenOptions::new()
                     .read(true)
-                    .write(true)
                     .create(true)
+                    .append(true)
                     .open(dir.path().join("tmp-open-123"))
                     .unwrap();
 

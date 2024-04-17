@@ -235,8 +235,8 @@ mod test {
 
         let mut file = fs::OpenOptions::new()
             .read(true)
-            .write(true)
             .create(true)
+            .append(true)
             .open(path)
             .unwrap();
         file.set_len(len).unwrap();
