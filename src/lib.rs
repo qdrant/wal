@@ -1,6 +1,7 @@
 use crossbeam_channel::{Receiver, Sender};
-use fs4::FileExt;
+use fs4::fs_std::FileExt;
 use log::{debug, info, trace, warn};
+pub use segment::{Entry, Segment};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
@@ -12,8 +13,6 @@ use std::path::{Path, PathBuf};
 use std::result;
 use std::str::FromStr;
 use std::thread;
-
-pub use segment::{Entry, Segment};
 
 mod mmap_view_sync;
 mod segment;
@@ -137,6 +136,7 @@ impl Wal {
                 .create(true)
                 .read(true)
                 .write(true)
+                .truncate(true)
                 .open(&path)?;
             path.pop();
             dir
@@ -514,7 +514,7 @@ impl Wal {
                 segment.copy_to_path(&dst_path)?;
             } else {
                 // if file is not locked by any Segment, just copy it
-                fs::copy(&entry.path(), &dst_path)?;
+                fs::copy(entry.path(), &dst_path)?;
             }
         }
         Ok(())
@@ -955,6 +955,7 @@ mod test {
                     .read(true)
                     .write(true)
                     .create(true)
+                    .truncate(true)
                     .open(dir.path().join("tmp-open-123"))
                     .unwrap();
 

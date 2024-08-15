@@ -14,7 +14,7 @@ use std::time::Duration;
 use crate::mmap_view_sync::MmapViewSync;
 use byteorder::{ByteOrder, LittleEndian};
 #[cfg(not(unix))]
-use fs4::FileExt;
+use fs4::fs_std::FileExt;
 
 /// The magic bytes and version tag of the segment header.
 const SEGMENT_MAGIC: &[u8; 3] = b"wal";
