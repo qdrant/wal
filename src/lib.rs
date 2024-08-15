@@ -136,6 +136,7 @@ impl Wal {
                 .create(true)
                 .read(true)
                 .write(true)
+                .truncate(true)
                 .open(&path)?;
             path.pop();
             dir
