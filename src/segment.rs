@@ -548,7 +548,7 @@ impl Segment {
     pub fn sufficient_capacity(&self, entry_len: usize) -> bool {
         (self.capacity() - self.size())
             .checked_sub(HEADER_LEN + CRC_LEN)
-            .map_or(false, |rem| rem >= entry_len + padding(entry_len))
+            .is_some_and(|rem| rem >= entry_len + padding(entry_len))
     }
 
     /// Returns the path to the segment file.

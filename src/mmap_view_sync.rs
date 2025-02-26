@@ -7,7 +7,7 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 /// ported from https://github.com/danburkert/memmap-rs in version 0.5.2
-
+///
 /// A thread-safe view of a memory map.
 ///
 /// The view may be split into disjoint ranges, each of which will share the
