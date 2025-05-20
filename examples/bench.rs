@@ -103,7 +103,7 @@ fn append(args: &Args) {
     let mut segment = Segment::create(path, segment_size).unwrap();
 
     let mut buf = vec![0; entry_size];
-    let mut small_rng = StdRng::from_entropy();
+    let mut small_rng = StdRng::from_os_rng();
     small_rng.fill_bytes(&mut buf);
 
     let mut append_hist = Histogram::<u64>::new_with_bounds(1, 60 * 60 * 1000, 2).unwrap();

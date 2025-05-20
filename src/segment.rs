@@ -898,7 +898,7 @@ mod test {
         );
     }
 
-    use rand::{rngs::OsRng, RngCore};
+    use rand::RngCore;
     use std::hash::Hasher;
 
     #[test]
@@ -917,8 +917,9 @@ mod test {
         let mut buffer = [0u8; 8192];
         let castagnoli = crc::Crc::<u32>::new(&crc::CRC_32_ISCSI);
 
+        let mut rng = rand::rng();
         (0..1024).for_each(|_| {
-            OsRng.fill_bytes(&mut buffer);
+            rng.fill_bytes(&mut buffer);
             let mut digest = castagnoli.digest();
             digest.update(&buffer);
             let crc1 = digest.finalize();
@@ -932,8 +933,9 @@ mod test {
         let mut buffer = [0u8; 8192];
         let castagnoli = crc::Crc::<u32>::new(&crc::CRC_32_ISCSI);
 
+        let mut rng = rand::rng();
         (0..1024).for_each(|seed| {
-            OsRng.fill_bytes(&mut buffer);
+            rng.fill_bytes(&mut buffer);
             let mut digest = castagnoli.digest_with_initial(seed);
             digest.update(&buffer);
             let crc1 = digest.finalize();

@@ -1,10 +1,11 @@
 use log::info;
+use rand::Rng;
 use std::env;
 use std::fmt;
 
 use rand;
 use rand::SeedableRng;
-use rand_distr::{Distribution, Standard};
+use rand_distr::{Distribution, StandardUniform};
 
 use crate::segment;
 
@@ -34,7 +35,7 @@ impl EntryGenerator {
     pub fn with_segment_capacity(size: usize) -> EntryGenerator {
         let seed: usize = env::var("WAL_TEST_SEED")
             .map(|seed| seed.parse::<usize>().unwrap())
-            .unwrap_or_else(|_| rand::random());
+            .unwrap_or_else(|_| rand::rng().random_range(0..usize::MAX));
         EntryGenerator::with_seed_and_segment_capacity(seed, size)
     }
 
@@ -66,7 +67,12 @@ impl Iterator for EntryGenerator {
         let padded_size = size + segment::entry_overhead(size);
         if self.remaining_size >= padded_size {
             self.remaining_size -= padded_size;
-            Some(Standard.sample_iter(&mut self.rng).take(size).collect())
+            Some(
+                StandardUniform
+                    .sample_iter(&mut self.rng)
+                    .take(size)
+                    .collect(),
+            )
         } else {
             self.remaining_size = 0;
             None
