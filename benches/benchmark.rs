@@ -1,12 +1,13 @@
 use crc::{Crc, CRC_32_ISCSI};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use rand::{rngs::OsRng, RngCore};
+use rand::RngCore;
 
 pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
 
 pub fn criterion_benchmark_4k(c: &mut Criterion) {
     let mut buffer = [0u8; 8192];
-    OsRng.fill_bytes(&mut buffer);
+    let mut rng = rand::rng();
+    rng.fill_bytes(&mut buffer);
 
     let mut group = c.benchmark_group("8k");
     group.throughput(criterion::Throughput::Bytes(8192));
@@ -27,7 +28,8 @@ pub fn criterion_benchmark_4k(c: &mut Criterion) {
 
 pub fn criterion_benchmark_1024k(c: &mut Criterion) {
     let mut buffer = [0u8; 1048576];
-    OsRng.fill_bytes(&mut buffer);
+    let mut rng = rand::rng();
+    rng.fill_bytes(&mut buffer);
 
     let mut group = c.benchmark_group("1M");
     group.throughput(criterion::Throughput::Bytes(1048576));

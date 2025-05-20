@@ -36,7 +36,7 @@ fn process_crash() {
 
 fn test() {
     let tempdir = Builder::new().prefix("segment").tempdir().unwrap();
-    let seed: usize = rand::thread_rng().next_u32() as usize;
+    let seed: usize = rand::rng().next_u32() as usize;
     let path = tempdir.path().join("segment");
 
     println!("Spawning subprocess; path: {path:?}; seed: {seed}");
