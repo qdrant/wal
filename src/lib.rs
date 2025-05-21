@@ -249,8 +249,7 @@ impl Wal {
 
         if let Some(flush) = self.flush.take() {
             flush.join().map_err(|err| {
-                Error::new(
-                    ErrorKind::Other,
+                Error::other(
                     format!("wal flush thread panicked: {err:?}"),
                 )
             })??;
@@ -628,7 +627,7 @@ impl SegmentCreator {
         self.rx.as_mut().unwrap().recv().map_err(|_| {
             match self.thread.take().map(|join_handle| join_handle.join()) {
                 Some(Ok(Err(error))) => error,
-                None => Error::new(ErrorKind::Other, "segment creator thread already failed"),
+                None => Error::other("segment creator thread already failed"),
                 Some(Ok(Ok(()))) => unreachable!(
                     "segment creator thread finished without an error,
                                                   but the segment creator is still live"
