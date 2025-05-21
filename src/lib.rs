@@ -142,7 +142,9 @@ impl Wal {
             dir
         };
 
-        dir.try_lock_exclusive()?;
+        if !dir.try_lock_exclusive()? {
+            return Err(fs4::lock_contended_error());
+        }
 
         // Holds open segments in the directory.
         let mut open_segments: Vec<OpenSegment> = Vec::new();
