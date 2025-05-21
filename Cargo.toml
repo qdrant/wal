@@ -10,7 +10,7 @@ license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://qdrant.tech/"
 repository = "https://github.com/qdrant/wal"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 byteorder = "1.5"

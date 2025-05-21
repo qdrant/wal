@@ -1031,8 +1031,7 @@ mod test {
         fn prefix_truncate(entry_count: u8, until: u8) -> TestResult {
             trace!(
                 "prefix truncate; entry_count: {}, until: {}",
-                entry_count,
-                until
+                entry_count, until
             );
             if until > entry_count {
                 return TestResult::discard();
