@@ -248,11 +248,9 @@ impl Wal {
         mem::swap(&mut self.open_segment, &mut segment);
 
         if let Some(flush) = self.flush.take() {
-            flush.join().map_err(|err| {
-                Error::other(
-                    format!("wal flush thread panicked: {err:?}"),
-                )
-            })??;
+            flush
+                .join()
+                .map_err(|err| Error::other(format!("wal flush thread panicked: {err:?}")))??;
         };
 
         self.flush = Some(segment.segment.flush_async());
