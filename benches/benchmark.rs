@@ -1,6 +1,7 @@
 use crc::{CRC_32_ISCSI, Crc};
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use rand::RngCore;
+use std::hint::black_box;
 
 pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
 
