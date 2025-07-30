@@ -1103,7 +1103,6 @@ mod test {
         }
     }
 
-
     #[test]
     fn test_prefix_truncate() {
         init_logger();
@@ -1119,10 +1118,12 @@ mod test {
         )
         .unwrap();
 
-        for truncate_index in 0..10 { // each item is a test case
+        for truncate_index in 0..10 {
+            // each item is a test case
             info!("truncate_index: {truncate_index}");
             assert!(wal.entry(0).is_none());
-            for i in 0..10 { // insert the same entry 10 times
+            for i in 0..10 {
+                // insert the same entry 10 times
                 assert_eq!(i, wal.append(&&entry[..]).unwrap());
             } // this should generate 4 closed segments with 2 entries each, while writing remaining data (96 bytes) to the open segment
 
