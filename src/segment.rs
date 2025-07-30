@@ -271,9 +271,7 @@ impl Segment {
                     LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]);
                 if entry_crc != stored_crc {
                     if stored_crc != 0 {
-                        log::warn!(
-                            "CRC mismatch at offset {offset}: {entry_crc} != {stored_crc}"
-                        );
+                        log::warn!("CRC mismatch at offset {offset}: {entry_crc} != {stored_crc}");
                     }
                     break;
                 }
