@@ -203,7 +203,7 @@ impl Segment {
             crc: seed,
             flush_offset: 0,
         };
-        debug!("{:?}: created", segment);
+        debug!("{segment:?}: created");
         Ok(segment)
     }
 
@@ -271,12 +271,7 @@ impl Segment {
                     LittleEndian::read_u32(&segment[offset + HEADER_LEN + padded_len..]);
                 if entry_crc != stored_crc {
                     if stored_crc != 0 {
-                        log::warn!(
-                            "CRC mismatch at offset {}: {} != {}",
-                            offset,
-                            entry_crc,
-                            stored_crc
-                        );
+                        log::warn!("CRC mismatch at offset {offset}: {entry_crc} != {stored_crc}");
                     }
                     break;
                 }
@@ -294,7 +289,7 @@ impl Segment {
             crc,
             flush_offset: 0,
         };
-        debug!("{:?}: opened", segment);
+        debug!("{segment:?}: opened");
         Ok(segment)
     }
 
@@ -388,11 +383,11 @@ impl Segment {
         if from >= self.index.len() {
             return;
         }
-        trace!("{:?}: truncating from position {}", self, from);
+        trace!("{self:?}: truncating from position {from}");
 
         // Remove the index entries.
         let deleted = self.index.drain(from..).count();
-        trace!("{:?}: truncated {} entries", self, deleted);
+        trace!("{self:?}: truncated {deleted} entries");
 
         // Update the CRC.
         if self.index.is_empty() {
@@ -410,18 +405,18 @@ impl Segment {
 
     /// Flushes recently written entries to durable storage.
     pub fn flush(&mut self) -> Result<()> {
-        trace!("{:?}: flushing", self);
+        trace!("{self:?}: flushing");
         let start = self.flush_offset;
         let end = self.size();
 
         match start.cmp(&end) {
             Ordering::Equal => {
-                trace!("{:?}: nothing to flush", self);
+                trace!("{self:?}: nothing to flush");
                 Ok(())
             } // nothing to flush
             Ordering::Less => {
                 // flush new elements added since last flush
-                trace!("{:?}: flushing byte range [{}, {})", self, start, end);
+                trace!("{self:?}: flushing byte range [{start}, {end})");
                 let mut view = unsafe { self.mmap.clone() };
                 self.flush_offset = end;
                 view.restrict(start, end - start)?;
@@ -430,7 +425,7 @@ impl Segment {
             Ordering::Greater => {
                 // most likely truncated in between flushes
                 // register new flush offset & flush the whole segment
-                trace!("{:?}: flushing after truncation", self);
+                trace!("{self:?}: flushing after truncation");
                 let view = unsafe { self.mmap.clone() };
                 self.flush_offset = end;
                 view.flush()
@@ -440,7 +435,7 @@ impl Segment {
 
     /// Flushes recently written entries to durable storage.
     pub fn flush_async(&mut self) -> thread::JoinHandle<Result<()>> {
-        trace!("{:?}: async flushing", self);
+        trace!("{self:?}: async flushing");
         let start = self.flush_offset;
         let end = self.size();
 
@@ -461,7 +456,7 @@ impl Segment {
                 };
 
                 thread::spawn(move || {
-                    trace!("{}", log_msg);
+                    trace!("{log_msg}");
                     view.restrict(start, end - start).and_then(|_| view.flush())
                 })
             }
@@ -478,7 +473,7 @@ impl Segment {
                 };
 
                 thread::spawn(move || {
-                    trace!("{}", log_msg);
+                    trace!("{log_msg}");
                     view.flush()
                 })
             }
@@ -495,7 +490,7 @@ impl Segment {
         // Sanity check the 8-byte alignment invariant.
         assert_eq!(required_capacity & !7, required_capacity);
         if required_capacity > self.capacity() {
-            debug!("{:?}: resizing to {} bytes", self, required_capacity);
+            debug!("{self:?}: resizing to {required_capacity} bytes");
             self.flush()?;
             let file = OpenOptions::new()
                 .read(true)
@@ -575,7 +570,7 @@ impl Segment {
 
     /// Deletes the segment file.
     pub fn delete(self) -> Result<()> {
-        debug!("{:?}: deleting file", self);
+        debug!("{self:?}: deleting file");
 
         #[cfg(not(target_os = "windows"))]
         {
@@ -591,7 +586,7 @@ impl Segment {
     #[cfg(not(target_os = "windows"))]
     fn delete_unix(self) -> Result<()> {
         fs::remove_file(&self.path).map_err(|e| {
-            error!("{:?}: failed to delete segment {}", self, e);
+            error!("{self:?}: failed to delete segment {e}");
             e
         })
     }

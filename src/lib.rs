@@ -238,12 +238,12 @@ impl Wal {
             path,
             flush: None,
         };
-        info!("{:?}: opened", wal);
+        info!("{wal:?}: opened");
         Ok(wal)
     }
 
     fn retire_open_segment(&mut self) -> Result<()> {
-        trace!("{:?}: retiring open segment", self);
+        trace!("{self:?}: retiring open segment");
         let mut segment = self.creator.next()?;
         mem::swap(&mut self.open_segment, &mut segment);
 
@@ -288,13 +288,13 @@ impl Wal {
     }
 
     pub fn flush_open_segment(&mut self) -> Result<()> {
-        trace!("{:?}: flushing open segments", self);
+        trace!("{self:?}: flushing open segments");
         self.open_segment.segment.flush()?;
         Ok(())
     }
 
     pub fn flush_open_segment_async(&mut self) -> thread::JoinHandle<Result<()>> {
-        trace!("{:?}: flushing open segments", self);
+        trace!("{self:?}: flushing open segments");
         self.open_segment.segment.flush_async()
     }
 
@@ -329,7 +329,7 @@ impl Wal {
     /// but the truncated entries are not guaranteed to be removed until the
     /// wal is flushed.
     pub fn truncate(&mut self, from: u64) -> Result<()> {
-        trace!("{:?}: truncate from entry {}", self, from);
+        trace!("{self:?}: truncate from entry {from}");
         let open_start_index = self.open_segment_start_index();
         if from >= open_start_index {
             self.open_segment
@@ -641,7 +641,7 @@ impl Drop for SegmentCreator {
         drop(self.rx.take());
         if let Some(join_handle) = self.thread.take() {
             if let Err(error) = join_handle.join() {
-                warn!("Error while shutting down segment creator: {:?}", error);
+                warn!("Error while shutting down segment creator: {error:?}");
             }
         }
     }
@@ -1029,10 +1029,7 @@ mod test {
     fn check_prefix_truncate() {
         init_logger();
         fn prefix_truncate(entry_count: u8, until: u8) -> TestResult {
-            trace!(
-                "prefix truncate; entry_count: {}, until: {}",
-                entry_count, until
-            );
+            trace!("prefix truncate; entry_count: {entry_count}, until: {until}");
             if until > entry_count {
                 return TestResult::discard();
             }
