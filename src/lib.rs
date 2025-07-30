@@ -128,7 +128,7 @@ impl Wal {
         } else {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                "max_closed_to_keep must be at least 1",
+                "max_closed_to_preserve must be at least 1",
             ));
         };
 
