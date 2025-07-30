@@ -8,6 +8,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{Error, ErrorKind, Result};
 use std::mem;
+use std::num::NonZeroUsize;
 use std::ops;
 use std::path::{Path, PathBuf};
 use std::result;
@@ -27,8 +28,8 @@ pub struct WalOptions {
     /// need to wait on creating a new segment.
     pub segment_queue_len: usize,
 
-    /// Keep these many "closed-*" wal files around. Defaults to 1.
-    pub max_closed_to_preserve: usize,
+    /// The number of "closed-*" wal files to retain. Defaults to 1.
+    pub retain_closed: NonZeroUsize,
 }
 
 impl Default for WalOptions {
@@ -36,7 +37,7 @@ impl Default for WalOptions {
         WalOptions {
             segment_capacity: 32 * 1024 * 1024,
             segment_queue_len: 0,
-            max_closed_to_preserve: 1,
+            retain_closed: NonZeroUsize::new(1).unwrap(),
         }
     }
 }
@@ -76,7 +77,8 @@ pub struct Wal {
     closed_segments: Vec<ClosedSegment>,
     creator: SegmentCreator,
 
-    max_closed_to_preserve: usize,
+    /// The number of closed segments to retain.
+    retain_closed: NonZeroUsize,
 
     /// The directory which contains the write ahead log. Used to hold an open
     /// file lock for the lifetime of the log.
@@ -122,15 +124,6 @@ impl Wal {
         P: AsRef<Path>,
     {
         debug!("Wal {{ path: {:?} }}: opening", path.as_ref());
-
-        let max_closed_to_preserve = if options.max_closed_to_preserve >= 1 {
-            options.max_closed_to_preserve
-        } else {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "max_closed_to_preserve must be at least 1",
-            ));
-        };
 
         #[cfg(not(target_os = "windows"))]
         let path = path.as_ref().to_path_buf();
@@ -248,7 +241,7 @@ impl Wal {
         let wal = Wal {
             open_segment,
             closed_segments,
-            max_closed_to_preserve,
+            retain_closed: options.retain_closed,
             creator,
             dir,
             path,
@@ -397,15 +390,6 @@ impl Wal {
         Ok(())
     }
 
-    /// Don't delete closed segments starting from this index.
-    ///
-    /// If `max_closed_to_preserve` is 1, only the last closed segment will be preserved.
-    fn preserved_closed_start_index(&self) -> usize {
-        self.closed_segments
-            .len()
-            .saturating_sub(self.max_closed_to_preserve)
-    }
-
     /// Possibly removes entries from the beginning of the log before the given index.
     ///
     /// After calling this method, the `first_index` will be between the current
@@ -425,12 +409,16 @@ impl Wal {
             return Ok(());
         }
 
-        let preserved_closed_start_index = self.preserved_closed_start_index();
+        // Retain closed segments starting from this index.
+        // If `retain_closed` is 1 (default), only the last closed segment will be preserved.
+        let retain_start_index = self
+            .closed_segments
+            .len()
+            .saturating_sub(self.retain_closed.get());
 
         // If `until` goes into or above our open segment, delete till preserved closed segment index
         if until >= self.open_segment_start_index() {
-            for segment in self.closed_segments.drain(..preserved_closed_start_index) {
-                // todo: verify
+            for segment in self.closed_segments.drain(..retain_start_index) {
                 segment.segment.delete()?
             }
             return Ok(());
@@ -438,10 +426,9 @@ impl Wal {
 
         // Delete all closed segments before the one `until` is in
         let index = self.find_closed_segment(until).unwrap();
-        let index = index.min(preserved_closed_start_index);
-        trace!("{self:?}: prefix truncating until closed segment {index}");
-        for segment in self.closed_segments.drain(..index) {
-            // todo: verify
+        let truncate_until_index = index.min(retain_start_index);
+        trace!("{self:?}: prefix truncating until closed segment {truncate_until_index}");
+        for segment in self.closed_segments.drain(..truncate_until_index) {
             segment.segment.delete()?
         }
         Ok(())
@@ -742,7 +729,7 @@ mod test {
         let options = WalOptions {
             segment_capacity: 80,
             segment_queue_len: 3,
-            max_closed_to_preserve: 1,
+            retain_closed: NonZeroUsize::new(1).unwrap(),
         };
 
         // Create empty wal with initial id 10.
@@ -788,7 +775,7 @@ mod test {
         let options = WalOptions {
             segment_capacity: 80,
             segment_queue_len: 3,
-            max_closed_to_preserve: 1,
+            retain_closed: NonZeroUsize::new(1).unwrap(),
         };
 
         // Create empty wal with initial id 10.
@@ -866,7 +853,7 @@ mod test {
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
-                    max_closed_to_preserve: 1,
+                    retain_closed: NonZeroUsize::new(1).unwrap(),
                 },
             )
             .unwrap();
@@ -901,7 +888,7 @@ mod test {
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
-                    max_closed_to_preserve: 1,
+                    retain_closed: NonZeroUsize::new(1).unwrap(),
                 },
             )
             .unwrap();
@@ -941,7 +928,7 @@ mod test {
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
-                    max_closed_to_preserve: 1,
+                    retain_closed: NonZeroUsize::new(1).unwrap(),
                 },
             )
             .unwrap();
@@ -974,7 +961,7 @@ mod test {
                     &WalOptions {
                         segment_capacity: 80,
                         segment_queue_len: 3,
-                        max_closed_to_preserve: 1,
+                        retain_closed: NonZeroUsize::new(1).unwrap(),
                     },
                 )
                 .unwrap();
@@ -1001,7 +988,7 @@ mod test {
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
-                    max_closed_to_preserve: 1,
+                    retain_closed: NonZeroUsize::new(1).unwrap(),
                 },
             )
             .unwrap();
@@ -1032,7 +1019,7 @@ mod test {
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
-                    max_closed_to_preserve: 1,
+                    retain_closed: NonZeroUsize::new(1).unwrap(),
                 },
             )
             .unwrap();
@@ -1065,12 +1052,7 @@ mod test {
     #[test]
     fn check_prefix_truncate() {
         init_logger();
-        fn prefix_truncate(
-            entry_count: u8,
-            until: u8,
-            max_closed_to_preserve: NonZeroUsize,
-        ) -> TestResult {
-            let max_closed_to_preserve = max_closed_to_preserve.get();
+        fn prefix_truncate(entry_count: u8, until: u8, retain_closed: NonZeroUsize) -> TestResult {
             trace!("prefix truncate; entry_count: {entry_count}, until: {until}");
             if until > entry_count {
                 return TestResult::discard();
@@ -1081,7 +1063,7 @@ mod test {
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
-                    max_closed_to_preserve,
+                    retain_closed,
                 },
             )
             .unwrap();
@@ -1090,26 +1072,27 @@ mod test {
                 .collect::<Vec<_>>();
 
             let mut has_ever_reached_max = false;
+            let retain_closed = retain_closed.get();
 
             for entry in &entries {
                 wal.append(entry).unwrap();
-                if wal.closed_segments.len() >= max_closed_to_preserve {
+                if wal.closed_segments.len() >= retain_closed {
                     has_ever_reached_max = true;
                 }
             }
 
             wal.prefix_truncate(until as u64).unwrap();
 
-            let preserving = if has_ever_reached_max {
+            let retained = if has_ever_reached_max {
                 // If it ever reaches max, it should stay there
-                wal.closed_segments.len() == max_closed_to_preserve
+                wal.closed_segments.len() == retain_closed
             } else {
-                wal.closed_segments.len() < max_closed_to_preserve
+                wal.closed_segments.len() < retain_closed
             };
 
             let num_entries = wal.num_entries() as u8;
             TestResult::from_bool(
-                num_entries <= entry_count && num_entries >= entry_count - until && preserving,
+                num_entries <= entry_count && num_entries >= entry_count - until && retained,
             )
         }
         quickcheck::quickcheck(prefix_truncate as fn(u8, u8, NonZeroUsize) -> TestResult);
@@ -1137,7 +1120,7 @@ mod test {
             &WalOptions {
                 segment_capacity: 4096,
                 segment_queue_len: 3,
-                max_closed_to_preserve: 1,
+                retain_closed: NonZeroUsize::new(1).unwrap(),
             },
         )
         .unwrap();
@@ -1223,7 +1206,7 @@ mod test {
             &WalOptions {
                 segment_capacity: 4096,
                 segment_queue_len: 3,
-                max_closed_to_preserve: 1,
+                retain_closed: NonZeroUsize::new(1).unwrap(),
             },
         )
         .unwrap();
@@ -1360,7 +1343,7 @@ mod test {
         let options = WalOptions {
             segment_capacity: 512,
             segment_queue_len: 3,
-            max_closed_to_preserve: 1,
+            retain_closed: NonZeroUsize::new(1).unwrap(),
         };
 
         let mut wal = Wal::with_options(dir.path(), &options).unwrap();
@@ -1395,7 +1378,7 @@ mod test {
         let options = WalOptions {
             segment_capacity: 512,
             segment_queue_len: 3,
-            max_closed_to_preserve: 1,
+            retain_closed: NonZeroUsize::new(1).unwrap(),
         };
         let start_index;
         {
