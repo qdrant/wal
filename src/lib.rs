@@ -692,7 +692,7 @@ fn create_loop(
 
 #[cfg(test)]
 mod test {
-    use log::trace;
+    use log::{info, trace};
     use quickcheck::TestResult;
     use std::io::Write;
     use tempfile::Builder;
@@ -1100,6 +1100,44 @@ mod test {
                 assert!(wal.entry(truncate_index - 1).is_some());
             }
             wal.truncate(0).unwrap();
+        }
+    }
+
+
+    #[test]
+    fn test_prefix_truncate() {
+        init_logger();
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
+        let entry: [u8; 2000] = [42u8; 2000];
+        let mut wal = Wal::with_options(
+            dir.path(),
+            &WalOptions {
+                segment_capacity: 4096, // ~= 2 * 2000 bytes. So each segment can hold 2 `entry`
+                segment_queue_len: 3,
+                // retain_closed: NonZeroUsize::new(2).unwrap(), // Retain 2 closed segments
+            },
+        )
+        .unwrap();
+
+        for truncate_index in 0..10 { // each item is a test case
+            info!("truncate_index: {truncate_index}");
+            assert!(wal.entry(0).is_none());
+            for i in 0..10 { // insert the same entry 10 times
+                assert_eq!(i, wal.append(&&entry[..]).unwrap());
+            } // this should generate 4 closed segments with 2 entries each, while writing remaining data (96 bytes) to the open segment
+
+            assert_eq!(wal.closed_segments.len(), 4);
+
+            // Do the prefix truncation
+            wal.prefix_truncate(truncate_index).unwrap();
+
+            // truncated_index shouldn't be gone while entries before it should be gone
+            assert!(wal.entry(truncate_index).is_some());
+            if truncate_index > 0 {
+                assert!(wal.entry(truncate_index - 1).is_none());
+            }
+
+            wal.truncate(0).unwrap(); // Delete all entries after each test case
         }
     }
 
