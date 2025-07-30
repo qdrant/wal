@@ -429,7 +429,8 @@ impl Wal {
 
         // If `until` goes into or above our open segment, delete till preserved closed segment index
         if until >= self.open_segment_start_index() {
-            for segment in self.closed_segments.drain(..preserved_closed_start_index) { // todo: verify
+            for segment in self.closed_segments.drain(..preserved_closed_start_index) {
+                // todo: verify
                 segment.segment.delete()?
             }
             return Ok(());
@@ -439,7 +440,8 @@ impl Wal {
         let index = self.find_closed_segment(until).unwrap();
         let range = ..index.min(preserved_closed_start_index);
         trace!("{self:?}: prefix truncating between segment range {range:?}");
-        for segment in self.closed_segments.drain(range) { // todo: verify
+        for segment in self.closed_segments.drain(range) {
+            // todo: verify
             segment.segment.delete()?
         }
         Ok(())
