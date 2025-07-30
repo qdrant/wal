@@ -399,7 +399,7 @@ impl Wal {
 
     /// Don't delete closed segments starting from this index.
     ///
-    /// If `num_closed_to_preserve` is 1, the last closed segment will be preserved.
+    /// If `max_closed_to_preserve` is 1, only the last closed segment will be preserved.
     fn preserved_closed_start_index(&self) -> usize {
         self.closed_segments
             .len()
@@ -723,7 +723,7 @@ fn create_loop(
 mod test {
     use log::trace;
     use quickcheck::TestResult;
-    use std::io::Write;
+    use std::{io::Write, num::NonZeroUsize};
     use tempfile::Builder;
 
     use crate::segment::Segment;
@@ -1065,7 +1065,12 @@ mod test {
     #[test]
     fn check_prefix_truncate() {
         init_logger();
-        fn prefix_truncate(entry_count: u8, until: u8) -> TestResult {
+        fn prefix_truncate(
+            entry_count: u8,
+            until: u8,
+            max_closed_to_preserve: NonZeroUsize,
+        ) -> TestResult {
+            let max_closed_to_preserve = max_closed_to_preserve.get();
             trace!("prefix truncate; entry_count: {entry_count}, until: {until}");
             if until > entry_count {
                 return TestResult::discard();
@@ -1076,7 +1081,7 @@ mod test {
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
-                    max_closed_to_preserve: 1,
+                    max_closed_to_preserve,
                 },
             )
             .unwrap();
@@ -1084,16 +1089,30 @@ mod test {
                 .take(entry_count as usize)
                 .collect::<Vec<_>>();
 
+            let mut has_ever_reached_max = false;
+
             for entry in &entries {
                 wal.append(entry).unwrap();
+                if wal.closed_segments.len() >= max_closed_to_preserve {
+                    has_ever_reached_max = true;
+                }
             }
 
             wal.prefix_truncate(until as u64).unwrap();
 
+            let preserving = if has_ever_reached_max {
+                // If it ever reaches max, it should stay there
+                wal.closed_segments.len() == max_closed_to_preserve
+            } else {
+                wal.closed_segments.len() < max_closed_to_preserve
+            };
+
             let num_entries = wal.num_entries() as u8;
-            TestResult::from_bool(num_entries <= entry_count && num_entries >= entry_count - until)
+            TestResult::from_bool(
+                num_entries <= entry_count && num_entries >= entry_count - until && preserving,
+            )
         }
-        quickcheck::quickcheck(prefix_truncate as fn(u8, u8) -> TestResult);
+        quickcheck::quickcheck(prefix_truncate as fn(u8, u8, NonZeroUsize) -> TestResult);
     }
 
     #[test]
