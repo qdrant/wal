@@ -438,9 +438,9 @@ impl Wal {
 
         // Delete all closed segments before the one `until` is in
         let index = self.find_closed_segment(until).unwrap();
-        let range = ..index.min(preserved_closed_start_index);
-        trace!("{self:?}: prefix truncating between segment range {range:?}");
-        for segment in self.closed_segments.drain(range) {
+        let index = index.min(preserved_closed_start_index);
+        trace!("{self:?}: prefix truncating until closed segment {index}");
+        for segment in self.closed_segments.drain(..index) {
             // todo: verify
             segment.segment.delete()?
         }
