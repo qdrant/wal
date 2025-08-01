@@ -1106,7 +1106,8 @@ mod test {
     fn viz_wal(wal: &Wal, kind: &str) {
         let wal_size = 15.max(wal.num_entries()) as usize;
         let mut bits = vec![None; wal_size];
-        for i in (wal.first_index() as usize)..(wal.last_index() as usize) {
+        for i in (wal.first_index() as usize)..=(wal.last_index() as usize) {
+            // for i in 0..wal_size {
             bits[i] = wal
                 .entry(i as u64)
                 .is_some()
@@ -1141,16 +1142,18 @@ mod test {
         let mut wal = Wal::with_options(
             dir.path(),
             &WalOptions {
-                segment_capacity: 4096, // ~= 2 * 2000 bytes. So each segment can hold 2 `entry`
+                segment_capacity: 4096, // ~= 2 * 2000 bytes. So each segment can hold > 2 `entry`
                 segment_queue_len: 3,
             },
         )
         .unwrap();
 
-        for truncate_index in 0..10 {
+        let num_entries = 10;
+
+        for truncate_index in 0..num_entries {
             info!("truncate_index: {truncate_index}");
             assert!(wal.entry(0).is_none());
-            for i in 0..10 {
+            for i in 0..num_entries {
                 // insert the same entry 10 times
                 assert_eq!(i, wal.append(&&entry[..]).unwrap());
             } // this should generate 4 closed segments with 2 entries each
@@ -1166,12 +1169,13 @@ mod test {
 
             // truncated_index shouldn't be gone while entries before it should be gone
             assert!(wal.entry(truncate_index).is_some());
-            let expected_trimmed_until = if truncate_index % 2 == 0 {
+            let expected_trimmed_until = if truncate_index > 6 {
+                num_entries - 4 // 4 comes from 1 closed segment + 1 open segment that must remain -> each having 2 entries
+            } else if truncate_index % 2 == 0 {
                 truncate_index.saturating_sub(1)
             } else {
                 truncate_index.saturating_sub(2)
-            }
-            .min(6);
+            };
             for i in (0..expected_trimmed_until).rev() {
                 assert!(wal.entry(i).is_none());
             }
@@ -1182,8 +1186,6 @@ mod test {
 
             wal.truncate(0).unwrap(); // Delete all entries after each test case
         }
-
-        panic!("hail viz!");
     }
 
     #[test]
