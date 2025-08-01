@@ -1103,6 +1103,36 @@ mod test {
         }
     }
 
+    fn viz_wal(wal: &Wal, kind: &str) {
+        let wal_size = 15.max(wal.num_entries()) as usize;
+        let mut bits = vec![None; wal_size];
+        for i in (wal.first_index() as usize)..(wal.last_index() as usize) {
+            bits[i] = wal
+                .entry(i as u64)
+                .is_some()
+                .then_some(true)
+                .or_else(|| Some(false));
+        }
+
+        // viz the values in ascii style table format:
+        let mut viz = String::new();
+        viz.push_str("Index: ");
+        for i in 0..wal_size {
+            viz.push_str(&format!("{:2} ", i));
+        }
+        viz.push('\n');
+        viz.push_str("Value: ");
+        for bit in &bits {
+            match bit {
+                Some(true) => viz.push_str(" 1 "),
+                Some(false) => viz.push_str(" 0 "),
+                None => viz.push_str(" - "),
+            }
+        }
+        viz.push('\n');
+        info!("Visualization of entries {kind} prefix truncation:\n{viz}");
+    }
+
     #[test]
     fn test_prefix_truncate() {
         init_logger();
@@ -1113,25 +1143,26 @@ mod test {
             &WalOptions {
                 segment_capacity: 4096, // ~= 2 * 2000 bytes. So each segment can hold 2 `entry`
                 segment_queue_len: 3,
-                // retain_closed: NonZeroUsize::new(2).unwrap(), // Retain 2 closed segments
             },
         )
         .unwrap();
 
-        for truncate_index in 0..8 {
-            // doing 8..10 will make the test code complex.
-            // each item is a test case
+        for truncate_index in 0..10 {
             info!("truncate_index: {truncate_index}");
             assert!(wal.entry(0).is_none());
             for i in 0..10 {
                 // insert the same entry 10 times
                 assert_eq!(i, wal.append(&&entry[..]).unwrap());
-            } // this should generate 4 closed segments with 2 entries each, while writing remaining data (96 bytes) to the open segment
+            } // this should generate 4 closed segments with 2 entries each
 
             assert_eq!(wal.closed_segments.len(), 4);
 
+            viz_wal(&wal, "before");
+
             // Do the prefix truncation
             wal.prefix_truncate(truncate_index).unwrap();
+
+            viz_wal(&wal, "after");
 
             // truncated_index shouldn't be gone while entries before it should be gone
             assert!(wal.entry(truncate_index).is_some());
@@ -1139,14 +1170,20 @@ mod test {
                 truncate_index.saturating_sub(1)
             } else {
                 truncate_index.saturating_sub(2)
-            };
+            }
+            .min(6);
             for i in (0..expected_trimmed_until).rev() {
                 assert!(wal.entry(i).is_none());
             }
-            assert_eq!(wal.closed_segments.len(), 4 - (truncate_index / 2) as usize);
+            assert_eq!(
+                wal.closed_segments.len(),
+                (4 - (truncate_index / 2) as usize).max(1) // leave at least one closed segment
+            );
 
             wal.truncate(0).unwrap(); // Delete all entries after each test case
         }
+
+        panic!("hail viz!");
     }
 
     #[test]
