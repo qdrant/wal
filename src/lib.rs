@@ -1103,37 +1103,6 @@ mod test {
         }
     }
 
-    fn viz_wal(wal: &Wal, kind: &str) {
-        let wal_size = 15.max(wal.num_entries()) as usize;
-        let mut bits = vec![None; wal_size];
-        for i in (wal.first_index() as usize)..=(wal.last_index() as usize) {
-            // for i in 0..wal_size {
-            bits[i] = wal
-                .entry(i as u64)
-                .is_some()
-                .then_some(true)
-                .or_else(|| Some(false));
-        }
-
-        // viz the values in ascii style table format:
-        let mut viz = String::new();
-        viz.push_str("Index: ");
-        for i in 0..wal_size {
-            viz.push_str(&format!("{:2} ", i));
-        }
-        viz.push('\n');
-        viz.push_str("Value: ");
-        for bit in &bits {
-            match bit {
-                Some(true) => viz.push_str(" 1 "),
-                Some(false) => viz.push_str(" 0 "),
-                None => viz.push_str(" - "),
-            }
-        }
-        viz.push('\n');
-        info!("Visualization of entries {kind} prefix truncation:\n{viz}");
-    }
-
     #[test]
     fn test_prefix_truncate() {
         init_logger();
@@ -1160,12 +1129,8 @@ mod test {
 
             assert_eq!(wal.closed_segments.len(), 4);
 
-            viz_wal(&wal, "before");
-
             // Do the prefix truncation
             wal.prefix_truncate(truncate_index).unwrap();
-
-            viz_wal(&wal, "after");
 
             // truncated_index shouldn't be gone while entries before it should be gone
             assert!(wal.entry(truncate_index).is_some());
