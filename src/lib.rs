@@ -1118,7 +1118,8 @@ mod test {
         )
         .unwrap();
 
-        for truncate_index in 0..10 {
+        for truncate_index in 0..8 {
+            // doing 8..10 will make the test code complex.
             // each item is a test case
             info!("truncate_index: {truncate_index}");
             assert!(wal.entry(0).is_none());
@@ -1134,9 +1135,15 @@ mod test {
 
             // truncated_index shouldn't be gone while entries before it should be gone
             assert!(wal.entry(truncate_index).is_some());
-            if truncate_index > 0 {
-                assert!(wal.entry(truncate_index - 1).is_none());
+            let expected_trimmed_until = if truncate_index % 2 == 0 {
+                truncate_index.saturating_sub(1)
+            } else {
+                truncate_index.saturating_sub(2)
+            };
+            for i in (0..expected_trimmed_until).rev() {
+                assert!(wal.entry(i).is_none());
             }
+            assert_eq!(wal.closed_segments.len(), 4 - (truncate_index / 2) as usize);
 
             wal.truncate(0).unwrap(); // Delete all entries after each test case
         }
