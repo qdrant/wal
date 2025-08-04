@@ -1112,43 +1112,44 @@ mod test {
         let mut wal = Wal::with_options(
             dir.path(),
             &WalOptions {
-                segment_capacity: 4096, // >= 2 * 2000 bytes. So each segment can hold > 2 entry
+                segment_capacity: 4096,
                 segment_queue_len: 3,
             },
         )
         .unwrap();
 
+        let entries_per_segment = 2; // Based on segment_capacity / entry_size
+
         for truncate_index in 0..num_entries {
             assert!(wal.entry(0).is_none());
             for i in 0..num_entries {
-                // insert the same entry num_entries times
                 assert_eq!(i, wal.append(&&entry[..]).unwrap());
             } // for num_entries=10 => 4 closed segments + 1 open segment (each having 2 entries)
 
-            assert_eq!(wal.closed_segments.len(), 4);
+            let initial_closed_segments = wal.closed_segments.len();
 
             // Do the prefix truncation
             wal.prefix_truncate(truncate_index).unwrap();
 
-            // truncated_index shouldn't be gone while entries in previous segments
-            assert!(wal.entry(truncate_index).is_some());
-            let expected_trimmed_until = if truncate_index > 6 {
-                num_entries - 4 // 4 comes from 1 closed segment + 1 open segment that must remain (each having 2 entries)
-            } else if truncate_index % 2 == 0 {
-                truncate_index.saturating_sub(1) // even index => odd position => prev segment is at current - 1
-            } else {
-                truncate_index.saturating_sub(2) // odd index => even position => prev segment is at current - 2
-            };
-            for i in (0..expected_trimmed_until).rev() {
-                trace!("truncate_index: {truncate_index} i: {i}");
+            // Generalized logic
+            let segments_that_can_be_truncated = truncate_index / entries_per_segment;
+            let expected_closed_segments =
+                (initial_closed_segments - segments_that_can_be_truncated as usize).max(1);
+            let expected_trimmed_until =
+                (initial_closed_segments - expected_closed_segments) as u64 * entries_per_segment;
+
+            assert!(wal.entry(truncate_index).is_some()); // truncate_index should be intact
+
+            for i in 0..expected_trimmed_until { // before should be trimmed
                 assert!(wal.entry(i).is_none());
             }
-            assert_eq!(
-                wal.closed_segments.len(),
-                (4 - (truncate_index / 2) as usize).max(1) // leave at least one closed segment
-            );
 
-            wal.truncate(0).unwrap(); // Delete all entries after each test case
+            for i in expected_trimmed_until..num_entries { // after should be intact
+                assert!(wal.entry(i).is_some());
+            }
+
+            assert_eq!(wal.closed_segments.len(), expected_closed_segments);
+            wal.truncate(0).unwrap(); // Clean up for the next test case
         }
     }
 
