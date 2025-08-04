@@ -1144,8 +1144,7 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_prefix_truncate() {
+    fn run_test_with_retain_closed(retain_closed: usize) {
         init_logger();
         let num_entries = 10;
         let dir = Builder::new().prefix("wal").tempdir().unwrap();
@@ -1155,7 +1154,7 @@ mod test {
             &WalOptions {
                 segment_capacity: 4096,
                 segment_queue_len: 3,
-                retain_closed: NonZeroUsize::new(1).unwrap(),
+                retain_closed: NonZeroUsize::new(retain_closed).unwrap(),
             },
         )
         .unwrap();
@@ -1195,6 +1194,13 @@ mod test {
             assert_eq!(wal.closed_segments.len(), expected_closed_segments);
             wal.truncate(0).unwrap(); // Clean up for the next test case
         }
+    }
+
+    #[test]
+    fn test_prefix_truncate_parametric() {
+        run_test_with_retain_closed(1);
+        run_test_with_retain_closed(2);
+        run_test_with_retain_closed(3);
     }
 
     #[test]
