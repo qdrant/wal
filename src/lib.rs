@@ -1155,6 +1155,7 @@ mod test {
             &WalOptions {
                 segment_capacity: 4096,
                 segment_queue_len: 3,
+                retain_closed: NonZeroUsize::new(1).unwrap(),
             },
         )
         .unwrap();
