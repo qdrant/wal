@@ -1140,11 +1140,13 @@ mod test {
 
             assert!(wal.entry(truncate_index).is_some()); // truncate_index should be intact
 
-            for i in 0..expected_trimmed_until { // before should be trimmed
+            for i in 0..expected_trimmed_until {
+                // before should be trimmed
                 assert!(wal.entry(i).is_none());
             }
 
-            for i in expected_trimmed_until..num_entries { // after should be intact
+            for i in expected_trimmed_until..num_entries {
+                // after should be intact
                 assert!(wal.entry(i).is_some());
             }
 
