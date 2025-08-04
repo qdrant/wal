@@ -1174,8 +1174,9 @@ mod test {
 
             // Generalized logic
             let segments_that_can_be_truncated = truncate_index / entries_per_segment;
-            let expected_closed_segments =
-                (initial_closed_segments - segments_that_can_be_truncated as usize).max(1);
+            let expected_closed_segments = (initial_closed_segments
+                - segments_that_can_be_truncated as usize)
+                .max(retain_closed);
             let expected_trimmed_until =
                 (initial_closed_segments - expected_closed_segments) as u64 * entries_per_segment;
 
