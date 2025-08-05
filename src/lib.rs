@@ -1104,6 +1104,58 @@ mod test {
     }
 
     #[test]
+    fn test_prefix_truncate() {
+        init_logger();
+        let num_entries = 10;
+        let dir = Builder::new().prefix("wal").tempdir().unwrap();
+        let entry: [u8; 2000] = [42u8; 2000];
+        let mut wal = Wal::with_options(
+            dir.path(),
+            &WalOptions {
+                segment_capacity: 4096,
+                segment_queue_len: 3,
+            },
+        )
+        .unwrap();
+
+        let entries_per_segment = 2; // Based on segment_capacity / entry_size
+
+        for truncate_index in 0..num_entries {
+            assert!(wal.entry(0).is_none());
+            for i in 0..num_entries {
+                assert_eq!(i, wal.append(&&entry[..]).unwrap());
+            } // for num_entries=10 => 4 closed segments + 1 open segment (each having 2 entries)
+
+            let initial_closed_segments = wal.closed_segments.len();
+
+            // Do the prefix truncation
+            wal.prefix_truncate(truncate_index).unwrap();
+
+            // Generalized logic
+            let segments_that_can_be_truncated = truncate_index / entries_per_segment;
+            let expected_closed_segments =
+                (initial_closed_segments - segments_that_can_be_truncated as usize).max(1);
+            let expected_trimmed_until =
+                (initial_closed_segments - expected_closed_segments) as u64 * entries_per_segment;
+
+            assert!(wal.entry(truncate_index).is_some()); // truncate_index should be intact
+
+            for i in 0..expected_trimmed_until {
+                // before should be trimmed
+                assert!(wal.entry(i).is_none());
+            }
+
+            for i in expected_trimmed_until..num_entries {
+                // after should be intact
+                assert!(wal.entry(i).is_some());
+            }
+
+            assert_eq!(wal.closed_segments.len(), expected_closed_segments);
+            wal.truncate(0).unwrap(); // Clean up for the next test case
+        }
+    }
+
+    #[test]
     fn test_truncate_flush() {
         init_logger();
         let dir = Builder::new().prefix("wal").tempdir().unwrap();
