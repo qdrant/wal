@@ -267,11 +267,11 @@ impl Wal {
         let start_index = self.open_segment_start_index();
 
         // If there is an empty closed segment, remove it before adding the new one.
-        if let Some(last_closed) = self.closed_segments.last() {
-            if last_closed.segment.is_empty() {
-                let empty_segment = self.closed_segments.pop().unwrap();
-                empty_segment.segment.delete()?;
-            }
+        if let Some(last_closed) = self.closed_segments.last()
+            && last_closed.segment.is_empty()
+        {
+            let empty_segment = self.closed_segments.pop().unwrap();
+            empty_segment.segment.delete()?;
         }
 
         self.closed_segments
@@ -655,10 +655,10 @@ impl SegmentCreator {
 impl Drop for SegmentCreator {
     fn drop(&mut self) {
         drop(self.rx.take());
-        if let Some(join_handle) = self.thread.take() {
-            if let Err(error) = join_handle.join() {
-                warn!("Error while shutting down segment creator: {error:?}");
-            }
+        if let Some(join_handle) = self.thread.take()
+            && let Err(error) = join_handle.join()
+        {
+            warn!("Error while shutting down segment creator: {error:?}");
         }
     }
 }
