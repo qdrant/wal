@@ -114,7 +114,7 @@ fn append(args: &Args) {
     let start_time: u64 = time;
     while segment.append(&buf).is_some() {
         entries += 1;
-        if args.flag_batch != 0 && entries % args.flag_batch == 0 {
+        if args.flag_batch != 0 && entries.is_multiple_of(args.flag_batch) {
             let start_sync = precise_time_ns();
             //future.await().unwrap();
             sync_hist.record(precise_time_ns() - start_sync).unwrap();
@@ -125,7 +125,7 @@ fn append(args: &Args) {
         small_rng.fill_bytes(&mut buf);
     }
 
-    if args.flag_batch != 0 && entries % args.flag_batch != 0 {
+    if args.flag_batch != 0 && !entries.is_multiple_of(args.flag_batch) {
         //segment.flush().await().unwrap();
         let new_time = precise_time_ns();
         append_hist.record(new_time - time).unwrap();
