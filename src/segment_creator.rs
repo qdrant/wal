@@ -87,7 +87,6 @@ impl SegmentCreatorV2 {
     }
 
     fn schedule_creation(&mut self) {
-        debug_assert!(self.thread.is_none());
         if self.thread.is_none() && self.pending_segments.len() < self.segment_queue_len {
             let count = self
                 .segment_queue_len
@@ -107,11 +106,16 @@ impl SegmentCreatorV2 {
 
     fn refill_pending(&mut self) -> std::io::Result<()> {
         if let Some(thread) = self.thread.take() {
-            let new_segments = thread
-                .join()
-                .map_err(|_| Error::other("segment creation thread panicked"))??;
-            self.current_id += new_segments.len() as u64;
-            self.pending_segments.extend(new_segments);
+            if self.pending_segments.is_empty() || thread.is_finished() {
+                let new_segments = thread
+                    .join()
+                    .map_err(|_| Error::other("segment creation thread panicked"))??;
+                self.current_id += new_segments.len() as u64;
+                self.pending_segments.extend(new_segments);
+            } else {
+                // Put the thread back if it's not finished, and we don't need segments yet.
+                self.thread = Some(thread);
+            }
         }
 
         Ok(())
@@ -169,6 +173,9 @@ mod tests {
         for i in 3..10 {
             assert_eq!(i, creator.next().unwrap().id);
         }
+
+        // This awaits for the thread to finish
+        drop(creator);
 
         // List directory contents
         let mut entries: Vec<_> = std::fs::read_dir(dir.path())

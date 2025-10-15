@@ -1,7 +1,6 @@
 use crate::segment_creator::SegmentCreatorV2;
-use crossbeam_channel::{Receiver, Sender};
 use fs4::fs_std::FileExt;
-use log::{debug, info, trace, warn};
+use log::{debug, info, trace};
 pub use segment::{Entry, Segment};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -606,124 +605,15 @@ fn open_dir_entry(entry: fs::DirEntry) -> Result<Option<WalSegment>> {
     }
 }
 
-#[allow(dead_code)]
-struct SegmentCreator {
-    /// Receive channel for new segments.
-    rx: Option<Receiver<OpenSegment>>,
-    /// The segment creator thread.
-    ///
-    /// Used for retrieving error upon failure.
-    thread: Option<thread::JoinHandle<Result<()>>>,
-}
-
-#[allow(dead_code)]
-impl SegmentCreator {
-    /// Creates a new segment creator.
-    ///
-    /// The segment creator must be started before new segments will be created.
-    pub fn new<P>(
-        dir: P,
-        existing: Vec<OpenSegment>,
-        segment_capacity: usize,
-        segment_queue_len: usize,
-    ) -> SegmentCreator
-    where
-        P: AsRef<Path>,
-    {
-        let (tx, rx) = crossbeam_channel::bounded(segment_queue_len);
-
-        let dir = dir.as_ref().to_path_buf();
-        let thread = thread::Builder::new()
-            .name("wal-segment-creator".to_string())
-            .spawn(move || create_loop(tx, dir, segment_capacity, existing))
-            .unwrap();
-        SegmentCreator {
-            rx: Some(rx),
-            thread: Some(thread),
-        }
-    }
-
-    /// Retrieves the next segment.
-    pub fn next(&mut self) -> Result<OpenSegment> {
-        self.rx.as_mut().unwrap().recv().map_err(|_| {
-            match self.thread.take().map(|join_handle| join_handle.join()) {
-                Some(Ok(Err(error))) => error,
-                None => Error::other("segment creator thread already failed"),
-                Some(Ok(Ok(()))) => unreachable!(
-                    "segment creator thread finished without an error,
-                                                  but the segment creator is still live"
-                ),
-                Some(Err(_)) => unreachable!("segment creator thread panicked"),
-            }
-        })
-    }
-}
-
-impl Drop for SegmentCreator {
-    fn drop(&mut self) {
-        drop(self.rx.take());
-        if let Some(join_handle) = self.thread.take()
-            && let Err(error) = join_handle.join()
-        {
-            warn!("Error while shutting down segment creator: {error:?}");
-        }
-    }
-}
-
-fn create_loop(
-    tx: Sender<OpenSegment>,
-    mut path: PathBuf,
-    capacity: usize,
-    mut existing_segments: Vec<OpenSegment>,
-) -> Result<()> {
-    // Ensure the existing segments are in ID order.
-    existing_segments.sort_by(|a, b| a.id.cmp(&b.id));
-
-    let mut cont = true;
-    let mut id = 0;
-
-    for segment in existing_segments {
-        id = segment.id;
-        if tx.send(segment).is_err() {
-            cont = false;
-            break;
-        }
-    }
-
-    // Directory being a file only applies to Linux
-    #[cfg(not(target_os = "windows"))]
-    let dir = File::open(&path)?;
-
-    while cont {
-        id += 1;
-        path.push(format!("open-{id}"));
-        let segment = OpenSegment {
-            id,
-            segment: Segment::create(&path, capacity)?,
-        };
-        path.pop();
-        // Sync the directory, guaranteeing that the segment file is durably
-        // stored on the filesystem.
-        #[cfg(not(target_os = "windows"))]
-        dir.sync_all()?;
-        cont = tx.send(segment).is_ok();
-    }
-
-    info!("segment creator shutting down");
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
+    use crate::test_utils::EntryGenerator;
     use log::trace;
     use quickcheck::TestResult;
     use std::{io::Write, num::NonZeroUsize};
     use tempfile::Builder;
 
-    use crate::segment::Segment;
-    use crate::test_utils::EntryGenerator;
-
-    use super::{OpenSegment, SegmentCreator, Wal, WalOptions};
+    use super::{Wal, WalOptions};
 
     fn init_logger() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -1332,22 +1222,6 @@ mod test {
         );
         drop(wal);
         assert!(Wal::open(dir.path()).is_ok());
-    }
-
-    #[test]
-    fn test_segment_creator() {
-        init_logger();
-        let dir = Builder::new().prefix("segment").tempdir().unwrap();
-
-        let segments = vec![OpenSegment {
-            id: 3,
-            segment: Segment::create(dir.path().join("open-3"), 1024).unwrap(),
-        }];
-
-        let mut creator = SegmentCreator::new(dir.path(), segments, 1024, 1);
-        for i in 3..10 {
-            assert_eq!(i, creator.next().unwrap().id);
-        }
     }
 
     #[test]
