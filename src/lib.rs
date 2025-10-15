@@ -1,3 +1,4 @@
+use crate::segment_creator::SegmentCreatorV2;
 use crossbeam_channel::{Receiver, Sender};
 use fs4::fs_std::FileExt;
 use log::{debug, info, trace, warn};
@@ -17,6 +18,7 @@ use std::thread;
 
 mod mmap_view_sync;
 mod segment;
+mod segment_creator;
 pub mod test_utils;
 
 #[derive(Debug)]
@@ -75,7 +77,7 @@ pub struct Wal {
     /// The segment currently being appended to.
     open_segment: OpenSegment,
     closed_segments: Vec<ClosedSegment>,
-    creator: SegmentCreator,
+    creator: SegmentCreatorV2,
 
     /// The number of closed segments to retain.
     retain_closed: NonZeroUsize,
@@ -226,7 +228,7 @@ impl Wal {
             }
         }
 
-        let mut creator = SegmentCreator::new(
+        let mut creator = SegmentCreatorV2::new(
             &path,
             unused_segments,
             options.segment_capacity,
@@ -604,6 +606,7 @@ fn open_dir_entry(entry: fs::DirEntry) -> Result<Option<WalSegment>> {
     }
 }
 
+#[allow(dead_code)]
 struct SegmentCreator {
     /// Receive channel for new segments.
     rx: Option<Receiver<OpenSegment>>,
@@ -613,6 +616,7 @@ struct SegmentCreator {
     thread: Option<thread::JoinHandle<Result<()>>>,
 }
 
+#[allow(dead_code)]
 impl SegmentCreator {
     /// Creates a new segment creator.
     ///
