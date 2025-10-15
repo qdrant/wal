@@ -629,7 +629,10 @@ impl SegmentCreator {
         let (tx, rx) = crossbeam_channel::bounded(segment_queue_len);
 
         let dir = dir.as_ref().to_path_buf();
-        let thread = thread::spawn(move || create_loop(tx, dir, segment_capacity, existing));
+        let thread = thread::Builder::new()
+            .name("wal-segment-creator".to_string())
+            .spawn(move || create_loop(tx, dir, segment_capacity, existing))
+            .unwrap();
         SegmentCreator {
             rx: Some(rx),
             thread: Some(thread),
