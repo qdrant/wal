@@ -1,5 +1,6 @@
 use crate::{OpenSegment, Segment};
 use log::warn;
+#[cfg(not(target_os = "windows"))]
 use std::fs::File;
 use std::io::Error;
 use std::path::{Path, PathBuf};
