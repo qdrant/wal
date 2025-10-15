@@ -31,7 +31,6 @@ fn create_segments(
     count: usize,
     segment_capacity: usize,
 ) -> std::io::Result<Vec<OpenSegment>> {
-
     // Directory being a file only applies to Linux
     #[cfg(not(target_os = "windows"))]
     let dir = File::open(&path)?;
