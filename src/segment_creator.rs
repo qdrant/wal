@@ -69,7 +69,7 @@ impl SegmentCreatorV2 {
     {
         let dir = dir.as_ref().to_path_buf();
 
-        existing.sort_by(|a, b| a.id.cmp(&b.id));
+        existing.sort_by_key(|segment| segment.id);
 
         let current_id = existing.last().map_or(1, |s| s.id + 1);
 
