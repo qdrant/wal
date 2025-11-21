@@ -282,13 +282,17 @@ impl Segment {
             }
         }
 
-        let segment = Segment {
+        let mut segment = Segment {
             mmap,
             path: path.as_ref().to_path_buf(),
             index,
             crc,
             flush_offset: 0,
         };
+
+        // Bump flush offset next to last entry, we don't need to flush any existing data
+        segment.flush_offset = segment.size();
+
         debug!("{segment:?}: opened");
         Ok(segment)
     }
