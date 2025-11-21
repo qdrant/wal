@@ -426,7 +426,7 @@ impl Segment {
             Ordering::Greater => {
                 // most likely truncated in between flushes
                 // register new flush offset & flush the whole segment
-                trace!("{self:?}: flushing after truncation");
+                error!("{self:?}: invalid flush range, flushing everything");
                 let result = self.mmap.flush();
                 self.flush_offset = end;
                 result
@@ -468,13 +468,13 @@ impl Segment {
                 self.flush_offset = end;
 
                 let log_msg = if log_enabled!(log::Level::Trace) {
-                    format!("{:?}: async flushing after truncation", &self)
+                    format!("{self:?}: invalid flush range, flushing everything")
                 } else {
                     String::new()
                 };
 
                 thread::spawn(move || {
-                    trace!("{log_msg}");
+                    error!("{log_msg}");
                     view.flush()
                 })
             }
@@ -709,7 +709,7 @@ mod test {
     use std::io::ErrorKind;
     use tempfile::Builder;
 
-    use super::{Segment, padding};
+    use super::{padding, Segment};
 
     use crate::test_utils::EntryGenerator;
 
