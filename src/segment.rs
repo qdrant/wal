@@ -399,6 +399,9 @@ impl Segment {
         // Zero all deleted entries so that we will not read the data back after a crash
         let zero_start = self.size();
         self.as_mut_slice()[zero_start..zero_end].fill(0);
+
+        // Bump flush offset to write new changes on next flush
+        self.flush_offset = zero_end;
     }
 
     /// Flushes recently written entries to durable storage.
