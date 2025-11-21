@@ -382,6 +382,8 @@ impl Segment {
         }
         trace!("{self:?}: truncating from position {from}");
 
+        let zero_end = self.size();
+
         // Remove the index entries.
         let deleted = self.index.drain(from..).count();
         trace!("{self:?}: truncated {deleted} entries");
@@ -394,10 +396,9 @@ impl Segment {
             self.crc = self._read_entry_crc(self.index.len() - 1);
         }
 
-        // And overwrite the existing data so that we will not read the data back after a crash.
-        let size = self.size();
-        let zeroes: [u8; 16] = [0; 16];
-        copy_memory(&zeroes, &mut self.as_mut_slice()[size..]);
+        // Zero all deleted entries so that we will not read the data back after a crash
+        let zero_start = self.size();
+        self.as_mut_slice()[zero_start..zero_end].fill(0);
     }
 
     /// Flushes recently written entries to durable storage.
