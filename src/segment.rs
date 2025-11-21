@@ -426,9 +426,9 @@ impl Segment {
                 // most likely truncated in between flushes
                 // register new flush offset & flush the whole segment
                 trace!("{self:?}: flushing after truncation");
-                let view = unsafe { self.mmap.clone() };
+                let result = self.mmap.flush();
                 self.flush_offset = end;
-                view.flush()
+                result
             }
         }
     }
