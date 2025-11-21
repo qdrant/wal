@@ -713,7 +713,7 @@ mod test {
     use std::io::ErrorKind;
     use tempfile::Builder;
 
-    use super::{padding, Segment};
+    use super::{Segment, padding};
 
     use crate::test_utils::EntryGenerator;
 
