@@ -416,26 +416,26 @@ impl Segment {
 
         match start.cmp(&end) {
             Ordering::Equal => {
+                // nothing to flush
                 trace!("{self:?}: nothing to flush");
-                Ok(())
-            } // nothing to flush
+            }
             Ordering::Less => {
                 // flush new elements added since last flush
                 trace!("{self:?}: flushing byte range [{start}, {end})");
                 let mut view = unsafe { self.mmap.clone() };
-                self.flush_offset = end;
                 view.restrict(start, end - start)?;
-                view.flush()
+                view.flush()?;
             }
             Ordering::Greater => {
                 // most likely truncated in between flushes
                 // register new flush offset & flush the whole segment
                 error!("{self:?}: invalid flush range, flushing everything");
-                let result = self.mmap.flush();
-                self.flush_offset = end;
-                result
+                self.mmap.flush()?;
             }
         }
+
+        self.flush_offset = end;
+        Ok(())
     }
 
     /// Flushes recently written entries to durable storage.
