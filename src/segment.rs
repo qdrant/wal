@@ -343,11 +343,8 @@ impl Segment {
         );
 
         if padding > 0 {
-            let zeros: [u8; 8] = [0; 8];
-            copy_memory(
-                &zeros[..padding],
-                &mut self.as_mut_slice()[offset + HEADER_LEN + entry.len()..],
-            );
+            let start = offset + HEADER_LEN + entry.len();
+            self.as_mut_slice()[start..start + padding].fill(0)
         }
         crc = crc32c::crc32c_append(
             !crc.reverse_bits(),
