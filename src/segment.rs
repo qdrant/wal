@@ -471,11 +471,8 @@ impl Segment {
                 let view = unsafe { self.mmap.clone() };
                 self.flush_offset = end;
 
-                let log_msg = if log_enabled!(log::Level::Trace) {
-                    format!("{self:?}: invalid flush range, flushing everything")
-                } else {
-                    String::new()
-                };
+                let log_msg =
+                    format!("{self:?}: invalid flush range, flushing everything asynchronously");
 
                 thread::spawn(move || {
                     error!("{log_msg}");
