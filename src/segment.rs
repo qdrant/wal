@@ -1,5 +1,5 @@
 use log::{debug, error, log_enabled, trace};
-use std::cmp::Ordering;
+use std::cmp::{min, Ordering};
 use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::{Error, ErrorKind, Result};
@@ -404,8 +404,8 @@ impl Segment {
         let zero_start = self.size();
         self.as_mut_slice()[zero_start..zero_end].fill(0);
 
-        // Bump flush offset to write new changes on next flush
-        self.flush_offset = zero_end;
+        // Move flush offset back to write new changes on next flush
+        self.flush_offset = min(self.flush_offset, zero_start);
     }
 
     /// Flushes recently written entries to durable storage.
