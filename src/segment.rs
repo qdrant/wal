@@ -1,5 +1,5 @@
 use log::{debug, error, log_enabled, trace};
-use std::cmp::{min, Ordering};
+use std::cmp::{Ordering, min};
 use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::{Error, ErrorKind, Result};
@@ -698,6 +698,21 @@ fn padding(len: usize) -> usize {
     4usize.wrapping_sub(len) & 7
 }
 
+/// Returns total number of bytes used on disk to store an entry of length `len`.
+///
+/// Includes header, padding and CRC.
+///
+/// | component                    | type |
+/// | ---------------------------- | ---- |
+/// | length                       | u64  |
+/// | data                         |      |
+/// | padding                      |      |
+/// | CRC(length + data + padding) | u32  |
+#[cfg(test)]
+pub fn entry_size_disk(len: usize) -> usize {
+    len + entry_overhead(len)
+}
+
 /// Returns the overhead of storing an entry of length `len`.
 pub fn entry_overhead(len: usize) -> usize {
     padding(len) + HEADER_LEN + CRC_LEN
@@ -710,12 +725,15 @@ pub fn segment_overhead() -> usize {
 
 #[cfg(test)]
 mod test {
-    use std::io::ErrorKind;
+    use std::{io::ErrorKind, path::Path};
     use tempfile::{Builder, TempDir};
 
     use super::{Segment, padding};
 
-    use crate::test_utils::EntryGenerator;
+    use crate::{
+        segment::{HEADER_LEN, entry_size_disk},
+        test_utils::EntryGenerator,
+    };
 
     #[test]
     fn test_pad_len() {
@@ -743,6 +761,12 @@ mod test {
         let mut path = dir.path().to_path_buf();
         path.push("sync-segment");
         (Segment::create(path, len).unwrap(), dir)
+    }
+
+    fn load_segment(dir: impl AsRef<Path>) -> Segment {
+        let mut path = dir.as_ref().to_path_buf();
+        path.push("sync-segment");
+        Segment::open(path).unwrap()
     }
 
     fn init_logger() {
@@ -778,6 +802,65 @@ mod test {
         check_append(&mut create_segment(1025).0);
         check_append(&mut create_segment(4096).0);
         check_append(&mut create_segment(8 * 1024 * 1024).0);
+    }
+
+    #[test]
+    fn test_truncate() {
+        init_logger();
+        let (mut segment, dir) = create_segment(4096);
+
+        segment.append(&b"0".as_slice()).unwrap();
+        segment.append(&b"1".as_slice()).unwrap();
+        segment.append(&b"2".as_slice()).unwrap();
+        segment.append(&b"3".as_slice()).unwrap();
+
+        // Truncate beyond the end is a no-op
+        assert_eq!(segment.len(), 4);
+        segment.truncate(4);
+        assert_eq!(segment.len(), 4);
+
+        // Until we flush, flush offset remains zero
+        assert_eq!(segment.flush_offset, 0);
+        segment.flush().unwrap();
+        assert_eq!(segment.flush_offset, HEADER_LEN + entry_size_disk(1) * 4);
+
+        // Truncate to keep one entry
+        segment.truncate(1);
+        assert_eq!(segment.len(), 1);
+        assert_eq!(segment.flush_offset, HEADER_LEN + entry_size_disk(1));
+
+        // Add a new items (index 2, 3), flush offset remains at index 1 until we flush
+        segment.append(&b"12345".as_slice()).unwrap();
+        segment.append(&b"67890".as_slice()).unwrap();
+        assert_eq!(segment.len(), 3);
+        assert_eq!(segment.flush_offset, HEADER_LEN + entry_size_disk(1));
+
+        // Flush and reload
+        // This was broken before <https://github.com/qdrant/wal/pull/99>, as it wouldn't fully
+        // flush the last two appended operations
+        segment.flush().unwrap();
+        assert_eq!(
+            segment.flush_offset,
+            HEADER_LEN + entry_size_disk(1) + entry_size_disk(5) * 2,
+        );
+        let mut segment = load_segment(&dir);
+        assert_eq!(segment.len(), 3);
+        assert_eq!(
+            segment.flush_offset,
+            HEADER_LEN + entry_size_disk(1) + entry_size_disk(5) * 2,
+        );
+
+        // Truncate all (clear) and assert flush offset is bumped
+        segment.truncate(0);
+        assert_eq!(segment.len(), 0);
+        assert_eq!(segment.flush_offset, HEADER_LEN);
+
+        // Flush and reload
+        segment.flush().unwrap();
+        assert_eq!(segment.flush_offset, HEADER_LEN);
+        let segment = load_segment(&dir);
+        assert_eq!(segment.len(), 0);
+        assert_eq!(segment.flush_offset, HEADER_LEN);
     }
 
     #[test]
