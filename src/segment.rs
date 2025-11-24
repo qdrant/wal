@@ -711,7 +711,7 @@ pub fn segment_overhead() -> usize {
 #[cfg(test)]
 mod test {
     use std::io::ErrorKind;
-    use tempfile::Builder;
+    use tempfile::{Builder, TempDir};
 
     use super::{Segment, padding};
 
@@ -738,11 +738,11 @@ mod test {
         assert_eq!(5, padding(15));
     }
 
-    fn create_segment(len: usize) -> Segment {
+    fn create_segment(len: usize) -> (Segment, TempDir) {
         let dir = Builder::new().prefix("segment").tempdir().unwrap();
         let mut path = dir.path().to_path_buf();
         path.push("sync-segment");
-        Segment::create(path, len).unwrap()
+        (Segment::create(path, len).unwrap(), dir)
     }
 
     fn init_logger() {
@@ -769,15 +769,15 @@ mod test {
     #[test]
     fn test_append() {
         init_logger();
-        check_append(&mut create_segment(8));
-        check_append(&mut create_segment(9));
-        check_append(&mut create_segment(32));
-        check_append(&mut create_segment(100));
-        check_append(&mut create_segment(1023));
-        check_append(&mut create_segment(1024));
-        check_append(&mut create_segment(1025));
-        check_append(&mut create_segment(4096));
-        check_append(&mut create_segment(8 * 1024 * 1024));
+        check_append(&mut create_segment(8).0);
+        check_append(&mut create_segment(9).0);
+        check_append(&mut create_segment(32).0);
+        check_append(&mut create_segment(100).0);
+        check_append(&mut create_segment(1023).0);
+        check_append(&mut create_segment(1024).0);
+        check_append(&mut create_segment(1025).0);
+        check_append(&mut create_segment(4096).0);
+        check_append(&mut create_segment(8 * 1024 * 1024).0);
     }
 
     #[test]
@@ -790,7 +790,7 @@ mod test {
     #[test]
     fn test_entries() {
         init_logger();
-        let mut segment = create_segment(4096);
+        let (mut segment, _dir) = create_segment(4096);
         let entries: &[&[u8]] = &[
             b"",
             b"0",
