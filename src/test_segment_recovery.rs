@@ -50,6 +50,10 @@ fn test_handling_missing_empty_segment() {
     }
 
     // Remove the last segment file (which is empty)
+    assert!(
+        !dir.path().join("open-3").exists(),
+        "open-3 should not exist",
+    );
     let last_segment_file = dir.path().join("open-2");
     std::fs::remove_file(last_segment_file).unwrap();
 
