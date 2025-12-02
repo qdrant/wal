@@ -20,6 +20,9 @@ mod segment;
 mod segment_creator;
 pub mod test_utils;
 
+#[cfg(test)]
+mod test_segment_recovery;
+
 #[derive(Debug)]
 pub struct WalOptions {
     /// The segment capacity. Defaults to 32MiB.
@@ -229,6 +232,7 @@ impl Wal {
 
         let mut creator = SegmentCreatorV2::new(
             &path,
+            open_segment.as_ref(),
             unused_segments,
             options.segment_capacity,
             options.segment_queue_len,
