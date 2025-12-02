@@ -1,5 +1,6 @@
 use crate::{OpenSegment, Segment};
 use log::warn;
+use std::cmp::max;
 #[cfg(not(target_os = "windows"))]
 use std::fs::File;
 use std::io::Error;
@@ -60,24 +61,38 @@ impl SegmentCreatorV2 {
     /// The segment creator must be started before new segments will be created.
     pub fn new<P>(
         dir: P,
-        mut existing: Vec<OpenSegment>,
+        open_segment: Option<&OpenSegment>,
+        mut unused_segments: Vec<OpenSegment>,
         segment_capacity: usize,
         segment_queue_len: usize,
     ) -> SegmentCreatorV2
     where
         P: AsRef<Path>,
     {
+        // Any open segment must have lower ID than all unused segments
+        debug_assert!(
+            unused_segments
+                .iter()
+                .all(|s| open_segment.as_ref().is_none_or(|o| s.id > o.id)),
+            "open_segment must have lower ID than all unused_segments",
+        );
+
         let dir = dir.as_ref().to_path_buf();
 
-        existing.sort_by_key(|segment| segment.id);
+        unused_segments.sort_by_key(|segment| segment.id);
 
-        let current_id = existing.last().map_or(1, |s| s.id + 1);
+        // Find the current id by incrementing either last unused segment or open segment
+        // If neither exists, start at 1
+        let current_id = unused_segments
+            .last()
+            .or(open_segment)
+            .map_or(1, |s| s.id + 1);
 
         let mut result = Self {
             dir,
-            pending_segments: existing,
+            pending_segments: unused_segments,
             segment_capacity,
-            segment_queue_len: segment_queue_len + 1, // Always create at least one segment
+            segment_queue_len: max(segment_queue_len, 1), // Always create at least one segment
             current_id,
             thread: None,
         };
@@ -165,13 +180,19 @@ mod tests {
         init_logger();
         let dir = Builder::new().prefix("segment").tempdir().unwrap();
 
-        let segments = vec![OpenSegment {
+        let segment = Some(OpenSegment {
             id: 3,
             segment: Segment::create(dir.path().join("open-3"), 1024).unwrap(),
+        });
+
+        let unused_segments = vec![OpenSegment {
+            id: 4,
+            segment: Segment::create(dir.path().join("open-4"), 1024).unwrap(),
         }];
 
-        let mut creator = SegmentCreatorV2::new(dir.path(), segments, 1024, 1);
-        for i in 3..10 {
+        let mut creator =
+            SegmentCreatorV2::new(dir.path(), segment.as_ref(), unused_segments, 1024, 1);
+        for i in 4..10 {
             assert_eq!(i, creator.next().unwrap().id);
         }
 
@@ -191,6 +212,65 @@ mod tests {
             eprintln!("{:?}", entry);
         }
 
+        assert_eq!(entries.len(), 10 - 3 + 1); // open-3 and open-4 existed, open-5 to open-9 created + open-10 created ahead
+    }
+
+    #[test]
+    fn test_segment_creator_v2_no_unused() {
+        init_logger();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
+
+        let segment = Some(OpenSegment {
+            id: 3,
+            segment: Segment::create(dir.path().join("open-3"), 1024).unwrap(),
+        });
+
+        let unused_segments = vec![];
+
+        let mut creator =
+            SegmentCreatorV2::new(dir.path(), segment.as_ref(), unused_segments, 1024, 1);
+        for i in 4..10 {
+            let another_segment = creator.next().unwrap();
+            eprintln!("another_segment = {:#?}", another_segment);
+            assert_eq!(i, another_segment.id);
+        }
+
+        // This awaits for the thread to finish
+        drop(creator);
+
+        // List directory contents
+        let mut entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|res| res.map(|e| e.file_name()))
+            .collect::<Result<_, std::io::Error>>()
+            .unwrap();
+
+        entries.sort();
+
+        for entry in &entries {
+            eprintln!("{:?}", entry);
+        }
+
         assert_eq!(entries.len(), 10 - 3 + 1); // open-3 existed, open-4 to open-9 created + open-10 created ahead
+    }
+
+    #[test]
+    #[should_panic(expected = "open_segment must have lower ID than all unused_segments")]
+    fn test_segment_creator_v2_invalid_open() {
+        init_logger();
+        let dir = Builder::new().prefix("segment").tempdir().unwrap();
+
+        let segment = Some(OpenSegment {
+            id: 4,
+            segment: Segment::create(dir.path().join("open-3"), 1024).unwrap(),
+        });
+
+        let unused_segments = vec![OpenSegment {
+            id: 4,
+            segment: Segment::create(dir.path().join("open-4"), 1024).unwrap(),
+        }];
+
+        // Expected to panic, open segment cannot have same or higher ID than unused segments
+        SegmentCreatorV2::new(dir.path(), segment.as_ref(), unused_segments, 1024, 1);
     }
 }
