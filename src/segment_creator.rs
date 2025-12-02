@@ -69,6 +69,14 @@ impl SegmentCreatorV2 {
     where
         P: AsRef<Path>,
     {
+        // Any open segment must have lower ID than all unused segments
+        debug_assert!(
+            unused_segments
+                .iter()
+                .all(|s| open_segment.as_ref().is_none_or(|o| s.id > o.id)),
+            "open_segment must have lower ID than all unused_segments",
+        );
+
         let dir = dir.as_ref().to_path_buf();
 
         unused_segments.sort_by_key(|segment| segment.id);
@@ -79,14 +87,6 @@ impl SegmentCreatorV2 {
             .last()
             .or(open_segment)
             .map_or(1, |s| s.id + 1);
-
-        // Any open segment must have lower ID than all unused segments
-        debug_assert!(
-            unused_segments
-                .iter()
-                .all(|s| open_segment.as_ref().is_none_or(|o| s.id > o.id)),
-            "open_segment must have lower ID than all unused_segments",
-        );
 
         let mut result = Self {
             dir,
