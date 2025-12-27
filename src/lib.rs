@@ -539,6 +539,13 @@ impl Wal {
         }
         Ok(())
     }
+
+    /// Set how many segments closed segments to retain on prefix truncation.
+    ///
+    /// Can't be less than 1. If 0 is provided, it will be set to 1.
+    pub fn set_retention(&mut self, retain_closed: usize) {
+        self.retain_closed = NonZeroUsize::new(retain_closed.max(1)).unwrap();
+    }
 }
 
 impl fmt::Debug for Wal {
