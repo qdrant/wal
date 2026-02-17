@@ -33,7 +33,7 @@ serde = { version = "1", features = ["derive"] }
 [dev-dependencies]
 crc = "3.3.0"
 hdrhistogram = "7.5.4"
-quickcheck = "=1.0.3"
+quickcheck = "1.0.3"
 regex = "1.11.3"
 tempfile = "3.23.0"
 chrono = "0.4.42"
