@@ -20,6 +20,7 @@ pub struct MmapViewSync {
 
 impl MmapViewSync {
     pub fn close(&self) {
+        #[cfg(target_os = "linux")]
         unsafe {
             let i = &mut *self.inner.get();
             i.unchecked_advise(memmap2::UncheckedAdvice::DontNeed)
