@@ -22,9 +22,10 @@ impl MmapViewSync {
     pub fn close(&self) {
         #[cfg(target_os = "linux")]
         unsafe {
-            let i = &mut *self.inner.get();
-            i.unchecked_advise(memmap2::UncheckedAdvice::DontNeed)
-                .unwrap();
+            let mmap = &mut *self.inner.get();
+            if let Err(err) = mmap.unchecked_advise(memmap2::UncheckedAdvice::DontNeed) {
+                log::warn!("Erorr clearing closed wal segment: {err:?}");
+            }
         }
     }
 
