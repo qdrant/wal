@@ -19,6 +19,14 @@ pub struct MmapViewSync {
 }
 
 impl MmapViewSync {
+    pub fn close(&self) {
+        unsafe {
+            let i = &mut *self.inner.get();
+            i.unchecked_advise(memmap2::UncheckedAdvice::DontNeed)
+                .unwrap();
+        }
+    }
+
     pub fn from_file(file: &File, offset: usize, capacity: usize) -> Result<MmapViewSync> {
         let mmap = unsafe {
             MmapOptions::new()

@@ -572,6 +572,7 @@ fn close_segment(mut segment: OpenSegment, start_index: u64) -> Result<ClosedSeg
         .path()
         .with_file_name(format!("closed-{start_index}"));
     segment.segment.rename(new_path)?;
+    segment.segment.close();
     Ok(ClosedSegment {
         start_index,
         segment: segment.segment,

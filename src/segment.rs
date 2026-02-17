@@ -111,6 +111,10 @@ pub struct Segment {
 }
 
 impl Segment {
+    pub fn close(&self) {
+        self.mmap.close()
+    }
+
     /// Creates a new segment.
     ///
     /// The initial capacity must be at least 8 bytes.
