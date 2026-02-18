@@ -19,6 +19,16 @@ pub struct MmapViewSync {
 }
 
 impl MmapViewSync {
+    pub fn close(&self) {
+        #[cfg(target_os = "linux")]
+        unsafe {
+            let mmap = &mut *self.inner.get();
+            if let Err(err) = mmap.unchecked_advise(memmap2::UncheckedAdvice::DontNeed) {
+                log::warn!("Erorr clearing closed wal segment: {err:?}");
+            }
+        }
+    }
+
     pub fn from_file(file: &File, offset: usize, capacity: usize) -> Result<MmapViewSync> {
         let mmap = unsafe {
             MmapOptions::new()

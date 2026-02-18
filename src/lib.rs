@@ -572,6 +572,7 @@ fn close_segment(mut segment: OpenSegment, start_index: u64) -> Result<ClosedSeg
         .path()
         .with_file_name(format!("closed-{start_index}"));
     segment.segment.rename(new_path)?;
+    segment.segment.close();
     Ok(ClosedSegment {
         start_index,
         segment: segment.segment,
@@ -621,7 +622,10 @@ mod test {
     use crate::test_utils::EntryGenerator;
     use log::trace;
     use quickcheck::TestResult;
-    use std::{io::Write, num::NonZeroUsize};
+    use std::{
+        io::Write,
+        num::{NonZeroU8, NonZeroUsize},
+    };
     use tempfile::Builder;
 
     use super::{Wal, WalOptions};
@@ -960,8 +964,10 @@ mod test {
     #[test]
     fn check_prefix_truncate() {
         init_logger();
-        fn prefix_truncate(entry_count: u8, until: u8, retain_closed: NonZeroUsize) -> TestResult {
-            trace!("prefix truncate; entry_count: {entry_count}, until: {until}");
+        fn prefix_truncate(entry_count: u8, until: u8, retain_closed: NonZeroU8) -> TestResult {
+            trace!(
+                "prefix truncate; entry_count: {entry_count}, until: {until}, retain_closed: {retain_closed}",
+            );
             if until > entry_count {
                 return TestResult::discard();
             }
@@ -971,7 +977,7 @@ mod test {
                 &WalOptions {
                     segment_capacity: 80,
                     segment_queue_len: 3,
-                    retain_closed,
+                    retain_closed: NonZeroUsize::from(retain_closed),
                 },
             )
             .unwrap();
@@ -980,7 +986,7 @@ mod test {
                 .collect::<Vec<_>>();
 
             let mut has_ever_reached_max = false;
-            let retain_closed = retain_closed.get();
+            let retain_closed = retain_closed.get() as usize;
 
             for entry in &entries {
                 wal.append(entry).unwrap();
@@ -993,7 +999,12 @@ mod test {
 
             let retained = if has_ever_reached_max {
                 // If it ever reaches max, it should stay there
-                wal.closed_segments.len() == retain_closed
+                if until < entry_count {
+                    // If `until` is (much) lower we might retain more to satisfy prefix_truncate
+                    wal.closed_segments.len() >= retain_closed
+                } else {
+                    wal.closed_segments.len() == retain_closed
+                }
             } else {
                 wal.closed_segments.len() < retain_closed
             };
@@ -1003,7 +1014,7 @@ mod test {
                 num_entries <= entry_count && num_entries >= entry_count - until && retained,
             )
         }
-        quickcheck::quickcheck(prefix_truncate as fn(u8, u8, NonZeroUsize) -> TestResult);
+        quickcheck::quickcheck(prefix_truncate as fn(u8, u8, NonZeroU8) -> TestResult);
     }
 
     #[test]
