@@ -18,8 +18,8 @@ jobs:
         os: [ ubuntu-latest, windows-latest ]
     steps:
       - name: Install minimal stable
-        uses: dtolnay/rust-toolchain@stable
-      - uses: actions/checkout@v6
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Check code formatting
         run: cargo fmt --all -- --check
       - name: Build
