@@ -162,7 +162,12 @@ impl Segment {
 
             // fs4 provides some cross-platform bindings which help for Windows.
             #[cfg(not(unix))]
-            file.allocate(capacity as u64)?;
+            {
+                file.allocate(capacity as u64)?;
+                // fs4 1.0 skips set_len when cluster allocation covers the size;
+                // explicitly set the logical size so the mmap has the right extent.
+                file.set_len(capacity as u64)?;
+            }
             // For all unix systems WAL can just use ftruncate directly
             #[cfg(unix)]
             {
@@ -505,7 +510,12 @@ impl Segment {
                 .open(&self.path)?;
             // fs4 provides some cross-platform bindings which help for Windows.
             #[cfg(not(unix))]
-            file.allocate(required_capacity as u64)?;
+            {
+                file.allocate(required_capacity as u64)?;
+                // fs4 1.0 skips set_len when cluster allocation covers the size;
+                // explicitly set the logical size so the mmap has the right extent.
+                file.set_len(required_capacity as u64)?;
+            }
             // For all unix systems WAL can just use ftruncate directly
             #[cfg(unix)]
             {
