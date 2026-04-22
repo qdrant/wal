@@ -1,5 +1,4 @@
 use crate::segment_creator::SegmentCreatorV2;
-use fs4::fs_std::FileExt;
 use log::{debug, info, trace};
 pub use segment::{Entry, Segment};
 use std::cmp::Ordering;
@@ -154,9 +153,7 @@ impl Wal {
             dir
         };
 
-        if !dir.try_lock_exclusive()? {
-            return Err(fs4::lock_contended_error());
-        }
+        dir.try_lock()?;
 
         // Holds open segments in the directory.
         let mut open_segments: Vec<OpenSegment> = Vec::new();
@@ -623,7 +620,7 @@ mod test {
     use log::trace;
     use quickcheck::TestResult;
     use std::{
-        io::Write,
+        io::{ErrorKind, Write},
         num::{NonZeroU8, NonZeroUsize},
     };
     use tempfile::Builder;
@@ -1239,7 +1236,7 @@ mod test {
         let dir = Builder::new().prefix("wal").tempdir().unwrap();
         let wal = Wal::open(dir.path()).unwrap();
         assert_eq!(
-            fs4::lock_contended_error().kind(),
+            ErrorKind::WouldBlock,
             Wal::open(dir.path()).unwrap_err().kind()
         );
         drop(wal);
