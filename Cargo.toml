@@ -19,7 +19,7 @@ log = "0.4"
 memmap2 = "0.9.4"
 rand = "0.9"
 rand_distr = "0.5"
-fs4 = "0.13.1"
+fs4 = "1.0.1"
 # fs4 depends on rustix, but pulling this dependency explicitly into the tree
 # to use direct functions on FreeBSD
 rustix = { version = "1", features = ["fs"] }
